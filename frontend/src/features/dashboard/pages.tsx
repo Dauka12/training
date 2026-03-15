@@ -1,11 +1,11 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { NotificationCenter } from '../notifications/NotificationCenter';
 import { WaterTracker } from '../tracking/WaterTracker';
 import { apiRequest } from '../../shared/api/client';
 import { t, type SupportedLocale } from '../../shared/i18n';
-import { CardStat, Checkbox, Field, SectionPage, StatusSelect } from '../../shared/ui/forms';
+import { CardStat, Checkbox, Field, SectionPage, SelectField, TextAreaField } from '../../shared/ui/forms';
 
 export function TodayPage({ locale }: { locale: SupportedLocale }) {
   const dashboard = useQuery({
@@ -276,11 +276,33 @@ export function TrackPage({ locale }: { locale: SupportedLocale }) {
     queryFn: () =>
       apiRequest<{ plan: { schedule: Array<{ id: string; session_name: string }> } }>('/plans/active')
   });
+  const hydrationSummary = useQuery({
+    queryKey: ['hydration-summary'],
+    queryFn: () =>
+      apiRequest<{
+        target_ml: number;
+        consumed_ml: number;
+        adherence: number;
+        weekly_target_ml: number;
+        weekly_consumed_ml: number;
+        weekly_adherence: number;
+      }>('/tracking/hydration/summary')
+  });
   const [mealStatus, setMealStatus] = useState('followed');
   const [mealNote, setMealNote] = useState('');
+  const [selectedScheduleID, setSelectedScheduleID] = useState('');
   const [workoutStatus, setWorkoutStatus] = useState('done');
+  const [discomfortFlag, setDiscomfortFlag] = useState(false);
+  const [difficulty, setDifficulty] = useState('6');
   const [workoutNote, setWorkoutNote] = useState('');
+  const [completionTime, setCompletionTime] = useState(() => toLocalDateTimeValue(new Date()));
   const [message, setMessage] = useState('');
+
+  useEffect(() => {
+    if (!selectedScheduleID && plan.data?.plan.schedule?.length) {
+      setSelectedScheduleID(plan.data.plan.schedule[0].id);
+    }
+  }, [plan.data, selectedScheduleID]);
 
   const mealMutation = useMutation({
     mutationFn: () =>
@@ -288,7 +310,10 @@ export function TrackPage({ locale }: { locale: SupportedLocale }) {
         method: 'POST',
         body: JSON.stringify({ status: mealStatus, note: mealNote })
       }),
-    onSuccess: () => setMessage(t(locale, 'common.save'))
+    onSuccess: async () => {
+      setMessage(t(locale, 'common.save'));
+      await queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+    }
   });
 
   const workoutMutation = useMutation({
@@ -296,18 +321,32 @@ export function TrackPage({ locale }: { locale: SupportedLocale }) {
       apiRequest('/tracking/workouts/log', {
         method: 'POST',
         body: JSON.stringify({
-          schedule_id: plan.data?.plan.schedule[0]?.id ?? '',
+          schedule_id: selectedScheduleID,
           status: workoutStatus,
-          discomfort_flag: false,
-          difficulty: 6,
+          discomfort_flag: discomfortFlag,
+          difficulty: Number(difficulty) || 6,
           note: workoutNote,
-          completion_time: new Date().toISOString()
+          completion_time: toRFC3339(completionTime)
         })
       }),
     onSuccess: async () => {
       setMessage(t(locale, 'common.save'));
       await queryClient.invalidateQueries({ queryKey: ['active-plan'] });
       await queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+      await queryClient.invalidateQueries({ queryKey: ['hydration-summary'] });
+    }
+  });
+
+  const waterMutation = useMutation({
+    mutationFn: (amount: number) =>
+      apiRequest('/tracking/water', {
+        method: 'POST',
+        body: JSON.stringify({ amount_ml: amount })
+      }),
+    onSuccess: async () => {
+      setMessage(t(locale, 'common.save'));
+      await queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+      await queryClient.invalidateQueries({ queryKey: ['hydration-summary'] });
     }
   });
 
@@ -319,8 +358,28 @@ export function TrackPage({ locale }: { locale: SupportedLocale }) {
       </section>
 
       <section className="card">
+        <div className="section-header">
+          <div>
+            <h2>{t(locale, 'track.water.title')}</h2>
+            <p className="muted">{t(locale, 'track.hydration.weekly')}</p>
+          </div>
+          <span className="badge badge--soft">
+            {(hydrationSummary.data?.weekly_consumed_ml ?? 0)} / {(hydrationSummary.data?.weekly_target_ml ?? 0)} {t(locale, 'common.unitMl')}
+          </span>
+        </div>
+        <WaterTracker
+          locale={locale}
+          currentML={hydrationSummary.data?.consumed_ml ?? 0}
+          targetML={hydrationSummary.data?.target_ml ?? 0}
+          onQuickAdd={(amount) => waterMutation.mutate(amount)}
+          onCustomAdd={(amount) => waterMutation.mutate(amount)}
+        />
+      </section>
+
+      <section className="card">
         <h2>{t(locale, 'track.meal.title')}</h2>
-        <StatusSelect
+        <SelectField
+          label={t(locale, 'common.status')}
           value={mealStatus}
           onChange={setMealStatus}
           options={[
@@ -329,27 +388,57 @@ export function TrackPage({ locale }: { locale: SupportedLocale }) {
             { value: 'off_plan', label: t(locale, 'track.meal.off') }
           ]}
         />
-        <textarea value={mealNote} onChange={(event) => setMealNote(event.target.value)} placeholder={t(locale, 'common.note')} />
-        <button type="button" className="button button--primary" onClick={() => mealMutation.mutate()}>
-          {t(locale, 'common.save')}
-        </button>
+        <TextAreaField label={t(locale, 'common.note')} value={mealNote} onChange={setMealNote} placeholder={t(locale, 'common.note')} />
+        <div className="button-row">
+          <button type="button" className="button button--primary" onClick={() => mealMutation.mutate()}>
+            {t(locale, 'common.save')}
+          </button>
+        </div>
       </section>
 
       <section className="card">
         <h2>{t(locale, 'track.workout.title')}</h2>
-        <StatusSelect
-          value={workoutStatus}
-          onChange={setWorkoutStatus}
-          options={[
-            { value: 'done', label: t(locale, 'track.workout.done') },
-            { value: 'partially_done', label: t(locale, 'track.workout.partial') },
-            { value: 'skipped', label: t(locale, 'track.workout.skipped') }
-          ]}
-        />
-        <textarea value={workoutNote} onChange={(event) => setWorkoutNote(event.target.value)} placeholder={t(locale, 'track.workout.note')} />
-        <button type="button" className="button button--primary" onClick={() => workoutMutation.mutate()}>
-          {t(locale, 'common.save')}
-        </button>
+        <div className="form-grid">
+          <SelectField
+            label={t(locale, 'track.workout.session')}
+            value={selectedScheduleID}
+            onChange={setSelectedScheduleID}
+            options={(plan.data?.plan.schedule ?? []).map((item) => ({
+              value: item.id,
+              label: item.session_name
+            }))}
+          />
+          <SelectField
+            label={t(locale, 'track.workout.status')}
+            value={workoutStatus}
+            onChange={setWorkoutStatus}
+            options={[
+              { value: 'done', label: t(locale, 'track.workout.done') },
+              { value: 'partially_done', label: t(locale, 'track.workout.partial') },
+              { value: 'skipped', label: t(locale, 'track.workout.skipped') },
+              { value: 'rescheduled', label: t(locale, 'track.workout.rescheduled') }
+            ]}
+          />
+          <Field label={t(locale, 'track.workout.difficulty')} value={difficulty} onChange={setDifficulty} />
+          <label className="field">
+            <span>{t(locale, 'track.workout.completedAt')}</span>
+            <input
+              aria-label={t(locale, 'track.workout.completedAt')}
+              type="datetime-local"
+              value={completionTime}
+              onChange={(event) => setCompletionTime(event.target.value)}
+            />
+          </label>
+        </div>
+        <div className="stack">
+          <Checkbox label={t(locale, 'track.workout.discomfort')} checked={discomfortFlag} onChange={setDiscomfortFlag} />
+          <TextAreaField label={t(locale, 'track.workout.note')} value={workoutNote} onChange={setWorkoutNote} placeholder={t(locale, 'track.workout.note')} />
+        </div>
+        <div className="button-row">
+          <button type="button" className="button button--primary" onClick={() => workoutMutation.mutate()} disabled={!selectedScheduleID}>
+            {t(locale, 'common.save')}
+          </button>
+        </div>
       </section>
     </>
   );
@@ -441,4 +530,17 @@ function translateStatus(locale: SupportedLocale, value: string) {
   const key = `status.${normalized}`;
   const translated = t(locale, key);
   return translated === key ? value : translated;
+}
+
+function toLocalDateTimeValue(date: Date) {
+  const local = new Date(date.getTime() - date.getTimezoneOffset() * 60_000);
+  return local.toISOString().slice(0, 16);
+}
+
+function toRFC3339(value: string) {
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return new Date().toISOString();
+  }
+  return parsed.toISOString();
 }

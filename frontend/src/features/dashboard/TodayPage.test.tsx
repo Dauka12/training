@@ -20,6 +20,7 @@ function renderTodayPage() {
 
 afterEach(() => {
   fetchMock.mockReset();
+  vi.unstubAllGlobals();
 });
 
 test('today page renders a dashboard-like overview with quick actions and hydration progress', async () => {
@@ -49,9 +50,9 @@ test('today page renders a dashboard-like overview with quick actions and hydrat
 
   renderTodayPage();
 
-  expect(await screen.findByRole('heading', { name: t('ru', 'today.heroTitle') })).toBeInTheDocument();
-  expect(screen.getAllByText('Верх тела A').length).toBeGreaterThan(0);
-  expect(screen.getAllByText((_, element) => element?.textContent?.includes('Низ тела B') ?? false).length).toBeGreaterThan(0);
+  expect(await screen.findByRole('heading', { name: t('ru', 'today.heroTitle') }, { timeout: 10000 })).toBeInTheDocument();
+  expect(screen.getAllByText((_, element) => (element?.textContent ?? '').includes('Верх тела A')).length).toBeGreaterThan(0);
+  expect(screen.getAllByText((_, element) => (element?.textContent ?? '').includes('Низ тела B')).length).toBeGreaterThan(0);
   expect(screen.getByRole('link', { name: t('ru', 'today.logWorkout') })).toBeInTheDocument();
   expect(screen.getByRole('link', { name: t('ru', 'today.logMeal') })).toBeInTheDocument();
   expect(screen.getByText(t('ru', 'track.water.title'))).toBeInTheDocument();

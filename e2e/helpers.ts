@@ -27,7 +27,7 @@ export async function login(page: Page, email: string, password: string) {
   await page.getByLabel('Email').fill(email);
   await page.getByLabel('Пароль').fill(password);
   await page.getByRole('button', { name: 'Войти' }).click();
-  await expect(page.getByRole('link', { name: 'Сегодня' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Выйти' })).toBeVisible();
 }
 
 export async function logout(page: Page) {

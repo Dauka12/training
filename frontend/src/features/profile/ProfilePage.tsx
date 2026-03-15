@@ -20,6 +20,8 @@ export function ProfilePage({ locale }: { locale: SupportedLocale }) {
         locale: string;
         theme: string;
         onboarding_done: boolean;
+        water_target_ml?: number;
+        water_override_ml?: number;
         profile?: {
           age?: number;
           biological_sex?: string;
@@ -84,7 +86,8 @@ export function ProfilePage({ locale }: { locale: SupportedLocale }) {
     setPreferences((current) => ({
       ...current,
       locale: (meQuery.data.locale as SupportedLocale) || locale,
-      theme: meQuery.data.theme || 'light'
+      theme: meQuery.data.theme || 'light',
+      water_override_ml: String(meQuery.data.water_override_ml ?? 0)
     }));
     if (meQuery.data.profile) {
       const source = meQuery.data.profile;

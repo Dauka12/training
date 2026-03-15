@@ -151,6 +151,7 @@ func (a *App) handleDashboard(w http.ResponseWriter, r *http.Request, user *User
 	}
 	a.mu.Lock()
 	defer a.mu.Unlock()
+	a.runReminderSweepLocked(a.now())
 	var currentPlan *PlanVersion
 	if len(user.PlanVersions) > 0 {
 		currentPlan = &user.PlanVersions[len(user.PlanVersions)-1]
@@ -172,7 +173,7 @@ func (a *App) handleDashboard(w http.ResponseWriter, r *http.Request, user *User
 		"meal_status":           mealStatus,
 		"hydration":             map[string]any{"target_ml": user.WaterTargetML, "consumed_ml": user.WaterConsumed},
 		"quick_actions":         []string{"log_workout", "log_meal", "log_water"},
-		"current_week_progress": map[string]int{"completed_sessions": completedWorkoutCount(user.WorkoutLogs)},
+		"current_week_progress": map[string]int{"completed_sessions": countRecentWorkoutsByStatusWithin(user.WorkoutLogs, "done", a.now(), 7*24*time.Hour)},
 		"latest_weight_trend":   latestWeight(user.WeeklyCheckins, user.Profile.CurrentWeightKG),
 		"next_session":          nextSession,
 		"plan_health":           a.planHealthForUserLocked(user),
@@ -260,7 +261,21 @@ func (a *App) handleHydrationSummary(w http.ResponseWriter, r *http.Request, use
 	if user.WaterTargetML > 0 {
 		adherence = float64(user.WaterConsumed) / float64(user.WaterTargetML)
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"target_ml": user.WaterTargetML, "consumed_ml": user.WaterConsumed, "adherence": adherence})
+	weeklyConsumed := recentWaterAmountML(user.WaterLogs, a.now(), 7*24*time.Hour)
+	weeklyTarget := user.WaterTargetML * 7
+	weeklyAdherence := 0.0
+	if weeklyTarget > 0 {
+		weeklyAdherence = float64(weeklyConsumed) / float64(weeklyTarget)
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"target_ml":           user.WaterTargetML,
+		"consumed_ml":         user.WaterConsumed,
+		"adherence":           adherence,
+		"weekly_target_ml":    weeklyTarget,
+		"weekly_consumed_ml":  weeklyConsumed,
+		"weekly_adherence":    weeklyAdherence,
+		"last_updated_at_utc": a.nowRFC3339(),
+	})
 }
 
 func (a *App) handleWeeklyCheckin(w http.ResponseWriter, r *http.Request, user *User) {
@@ -281,7 +296,7 @@ func (a *App) handleWeeklyCheckin(w http.ResponseWriter, r *http.Request, user *
 		hydrationAdherence = float64(user.WaterConsumed) / float64(user.WaterTargetML)
 	}
 	reason, triggered := planlogic.EvaluateRegenerationTrigger(planlogic.RegenerationInput{
-		MissedWorkoutsLast7Days: countWorkoutsByStatus(user.WorkoutLogs, "skipped"),
+		MissedWorkoutsLast7Days: countRecentWorkoutsByStatusWithin(user.WorkoutLogs, "skipped", a.now(), 7*24*time.Hour),
 		AvailabilityChanged:     req.AvailabilityChanged,
 		EquipmentChanged:        req.EquipmentChanged,
 		InjuryChanged:           req.InjuryChanged,
@@ -519,7 +534,11 @@ func countWorkoutsByStatus(logs []WorkoutLog, status string) int {
 }
 
 func countRecentWorkoutsByStatus(logs []WorkoutLog, status string, now time.Time) int {
-	cutoff := now.Add(-14 * 24 * time.Hour)
+	return countRecentWorkoutsByStatusWithin(logs, status, now, 14*24*time.Hour)
+}
+
+func countRecentWorkoutsByStatusWithin(logs []WorkoutLog, status string, now time.Time, window time.Duration) int {
+	cutoff := now.Add(-window)
 	total := 0
 	for _, item := range logs {
 		if item.Status != status {
@@ -539,6 +558,22 @@ func countRecentWorkoutsByStatus(logs []WorkoutLog, status string, now time.Time
 
 func completedWorkoutCount(logs []WorkoutLog) int {
 	return countWorkoutsByStatus(logs, "done")
+}
+
+func countRecentWorkoutLogs(logs []WorkoutLog, now time.Time, window time.Duration) int {
+	cutoff := now.Add(-window)
+	total := 0
+	for _, item := range logs {
+		if item.CompletionTime == "" {
+			continue
+		}
+		completedAt, err := time.Parse(time.RFC3339, item.CompletionTime)
+		if err != nil || completedAt.Before(cutoff) {
+			continue
+		}
+		total++
+	}
+	return total
 }
 
 func countMealsByStatus(logs []MealLog, status string) int {
@@ -575,15 +610,7 @@ func recentHydrationAdherence(logs []WaterLog, dailyTarget int, now time.Time) i
 	if dailyTarget <= 0 {
 		return 0
 	}
-	cutoff := now.Add(-14 * 24 * time.Hour)
-	totalML := 0
-	for _, item := range logs {
-		createdAt, err := time.Parse(time.RFC3339, item.CreatedAt)
-		if err != nil || createdAt.Before(cutoff) {
-			continue
-		}
-		totalML += item.AmountML
-	}
+	totalML := recentWaterAmountML(logs, now, 14*24*time.Hour)
 	if totalML == 0 {
 		return 0
 	}
@@ -596,24 +623,39 @@ func recentHydrationAdherence(logs []WaterLog, dailyTarget int, now time.Time) i
 }
 
 func (a *App) planHealthForUserLocked(user *User) trackinglogic.PlanHealth {
+	now := a.now()
 	workoutAdherence := 1.0
-	if len(user.WorkoutLogs) > 0 {
-		workoutAdherence = float64(completedWorkoutCount(user.WorkoutLogs)) / float64(len(user.WorkoutLogs))
+	recentWorkoutLogs := countRecentWorkoutLogs(user.WorkoutLogs, now, 14*24*time.Hour)
+	if recentWorkoutLogs > 0 {
+		workoutAdherence = float64(countRecentWorkoutsByStatus(user.WorkoutLogs, "done", now)) / float64(recentWorkoutLogs)
 	}
 	mealAdherence := 1.0
 	if len(user.MealLogs) > 0 {
-		mealAdherence = float64(countMealsByStatus(user.MealLogs, "followed")) / float64(len(user.MealLogs))
+		mealAdherence = float64(recentMealAdherence(user.MealLogs, now)) / 100
 	}
 	hydrationAdherence := 0.0
 	if user.WaterTargetML > 0 {
-		hydrationAdherence = float64(user.WaterConsumed) / float64(user.WaterTargetML)
+		hydrationAdherence = float64(recentHydrationAdherence(user.WaterLogs, user.WaterTargetML, now)) / 100
 	}
 	return trackinglogic.ComputePlanHealth(trackinglogic.Summary{
 		WorkoutAdherence:   workoutAdherence,
 		MealAdherence:      mealAdherence,
 		HydrationAdherence: hydrationAdherence,
-		MissedLast7Days:    countWorkoutsByStatus(user.WorkoutLogs, "skipped"),
+		MissedLast7Days:    countRecentWorkoutsByStatusWithin(user.WorkoutLogs, "skipped", now, 7*24*time.Hour),
 	})
+}
+
+func recentWaterAmountML(logs []WaterLog, now time.Time, window time.Duration) int {
+	cutoff := now.Add(-window)
+	totalML := 0
+	for _, item := range logs {
+		createdAt, err := time.Parse(time.RFC3339, item.CreatedAt)
+		if err != nil || createdAt.Before(cutoff) {
+			continue
+		}
+		totalML += item.AmountML
+	}
+	return totalML
 }
 
 func weekdayToTime(weekday string) time.Weekday {

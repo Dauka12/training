@@ -277,14 +277,17 @@ func (a *App) withRoles(next func(http.ResponseWriter, *http.Request, *User), ro
 
 func (a *App) handleMe(w http.ResponseWriter, _ *http.Request, user *User) {
 	writeJSON(w, http.StatusOK, map[string]any{
-		"id":              user.ID,
-		"email":           user.Email,
-		"locale":          user.Locale,
-		"theme":           user.Theme,
-		"roles":           user.Roles,
-		"verified":        user.Verified,
-		"onboarding_done": user.OnboardingDone,
-		"profile":         user.Profile,
+		"id":                user.ID,
+		"email":             user.Email,
+		"locale":            user.Locale,
+		"theme":             user.Theme,
+		"roles":             user.Roles,
+		"verified":          user.Verified,
+		"onboarding_done":   user.OnboardingDone,
+		"profile":           user.Profile,
+		"water_target_ml":   user.WaterTargetML,
+		"water_override_ml": user.WaterOverrideML,
+		"water_consumed_ml": user.WaterConsumed,
 	})
 }
 
@@ -308,6 +311,13 @@ func (a *App) handlePreferences(w http.ResponseWriter, r *http.Request, user *Us
 	if req.WaterOverrideML > 0 {
 		user.WaterOverrideML = req.WaterOverrideML
 		user.WaterTargetML = req.WaterOverrideML
+	} else {
+		user.WaterOverrideML = 0
+		if user.OnboardingDone {
+			user.WaterTargetML = calculateNutritionTargets(user).DailyWaterML
+		} else {
+			user.WaterTargetML = 0
+		}
 	}
 	a.persistStateLocked()
 	writeJSON(w, http.StatusOK, map[string]string{"status": "saved"})

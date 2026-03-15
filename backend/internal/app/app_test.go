@@ -9,6 +9,7 @@ import (
 	"net/http/cookiejar"
 	"net/http/httptest"
 	"testing"
+	"time"
 )
 
 func TestRegisterVerifyLoginForgotResetFlow(t *testing.T) {
@@ -359,6 +360,166 @@ func TestOnboardingPersistsExtendedPlanningPreferencesAndReturnsProfile(t *testi
 	}
 	if payload.Profile.HydrationPreference != "small_frequent_sips" {
 		t.Fatalf("expected hydration preference saved, got %q", payload.Profile.HydrationPreference)
+	}
+}
+
+func TestPreferencesExposeWaterOverrideAndAllowReset(t *testing.T) {
+	now := time.Date(2026, time.March, 15, 9, 0, 0, 0, time.UTC)
+	_, server, client, _ := createVerifiedSessionWithOptions(t, WithClock(fixedClock{now: now}))
+	defer server.Close()
+	csrf := cookieValue(t, client, server.URL, "csrf")
+
+	onboardingResp := doJSON(t, client, http.MethodPut, server.URL+"/api/v1/onboarding", map[string]any{
+		"age":                    28,
+		"biological_sex":         "male",
+		"height_cm":              180,
+		"current_weight_kg":      86,
+		"target_weight_kg":       78,
+		"primary_goal":           "lose_fat",
+		"program_duration_weeks": 12,
+		"experience_level":       "beginner",
+		"activity_level":         "light",
+		"training_location":      "mixed",
+		"timezone":               "Asia/Qyzylorda",
+		"available_training_days": []map[string]any{
+			{"weekday": "monday", "duration_min": 60},
+		},
+		"equipment_ids": []string{"10000000-0000-0000-0000-000000000001"},
+	}, csrf)
+	if onboardingResp.StatusCode != http.StatusOK {
+		t.Fatalf("expected onboarding ok, got %d", onboardingResp.StatusCode)
+	}
+
+	meResp := doJSON(t, client, http.MethodGet, server.URL+"/api/v1/me", nil, "")
+	if meResp.StatusCode != http.StatusOK {
+		t.Fatalf("expected me ok, got %d", meResp.StatusCode)
+	}
+	var initial struct {
+		WaterTargetML   int `json:"water_target_ml"`
+		WaterOverrideML int `json:"water_override_ml"`
+	}
+	if err := json.NewDecoder(meResp.Body).Decode(&initial); err != nil {
+		t.Fatal(err)
+	}
+	if initial.WaterTargetML <= 0 {
+		t.Fatalf("expected deterministic water target, got %d", initial.WaterTargetML)
+	}
+	if initial.WaterOverrideML != 0 {
+		t.Fatalf("expected no override by default, got %d", initial.WaterOverrideML)
+	}
+
+	saveOverrideResp := doJSON(t, client, http.MethodPut, server.URL+"/api/v1/me/preferences", map[string]any{
+		"locale":            "ru",
+		"theme":             "light",
+		"water_override_ml": 3100,
+	}, csrf)
+	if saveOverrideResp.StatusCode != http.StatusOK {
+		t.Fatalf("expected save override ok, got %d", saveOverrideResp.StatusCode)
+	}
+
+	meWithOverrideResp := doJSON(t, client, http.MethodGet, server.URL+"/api/v1/me", nil, "")
+	if meWithOverrideResp.StatusCode != http.StatusOK {
+		t.Fatalf("expected me with override ok, got %d", meWithOverrideResp.StatusCode)
+	}
+	var withOverride struct {
+		WaterTargetML   int `json:"water_target_ml"`
+		WaterOverrideML int `json:"water_override_ml"`
+	}
+	if err := json.NewDecoder(meWithOverrideResp.Body).Decode(&withOverride); err != nil {
+		t.Fatal(err)
+	}
+	if withOverride.WaterOverrideML != 3100 {
+		t.Fatalf("expected override 3100, got %d", withOverride.WaterOverrideML)
+	}
+	if withOverride.WaterTargetML != 3100 {
+		t.Fatalf("expected target to follow override, got %d", withOverride.WaterTargetML)
+	}
+
+	resetOverrideResp := doJSON(t, client, http.MethodPut, server.URL+"/api/v1/me/preferences", map[string]any{
+		"locale":            "ru",
+		"theme":             "light",
+		"water_override_ml": 0,
+	}, csrf)
+	if resetOverrideResp.StatusCode != http.StatusOK {
+		t.Fatalf("expected reset override ok, got %d", resetOverrideResp.StatusCode)
+	}
+
+	meAfterResetResp := doJSON(t, client, http.MethodGet, server.URL+"/api/v1/me", nil, "")
+	if meAfterResetResp.StatusCode != http.StatusOK {
+		t.Fatalf("expected me after reset ok, got %d", meAfterResetResp.StatusCode)
+	}
+	var afterReset struct {
+		WaterTargetML   int `json:"water_target_ml"`
+		WaterOverrideML int `json:"water_override_ml"`
+	}
+	if err := json.NewDecoder(meAfterResetResp.Body).Decode(&afterReset); err != nil {
+		t.Fatal(err)
+	}
+	if afterReset.WaterOverrideML != 0 {
+		t.Fatalf("expected override reset to 0, got %d", afterReset.WaterOverrideML)
+	}
+	if afterReset.WaterTargetML != initial.WaterTargetML {
+		t.Fatalf("expected deterministic target restored to %d, got %d", initial.WaterTargetML, afterReset.WaterTargetML)
+	}
+}
+
+func TestWeeklyCheckinIgnoresOldSkippedWorkoutsOutsideSevenDayWindow(t *testing.T) {
+	now := time.Date(2026, time.March, 15, 9, 0, 0, 0, time.UTC)
+	app, server, client, email := createVerifiedSessionWithOptions(t, WithClock(fixedClock{now: now}))
+	defer server.Close()
+	csrf := cookieValue(t, client, server.URL, "csrf")
+
+	onboardingResp := doJSON(t, client, http.MethodPut, server.URL+"/api/v1/onboarding", map[string]any{
+		"age":                    28,
+		"biological_sex":         "male",
+		"height_cm":              180,
+		"current_weight_kg":      86,
+		"target_weight_kg":       78,
+		"primary_goal":           "lose_fat",
+		"program_duration_weeks": 12,
+		"experience_level":       "beginner",
+		"activity_level":         "light",
+		"training_location":      "mixed",
+		"timezone":               "Asia/Qyzylorda",
+		"available_training_days": []map[string]any{
+			{"weekday": "monday", "duration_min": 60},
+			{"weekday": "wednesday", "duration_min": 45},
+		},
+		"equipment_ids": []string{"10000000-0000-0000-0000-000000000001"},
+	}, csrf)
+	if onboardingResp.StatusCode != http.StatusOK {
+		t.Fatalf("expected onboarding ok, got %d", onboardingResp.StatusCode)
+	}
+
+	app.mu.Lock()
+	user := app.byMail[email]
+	user.WorkoutLogs = []WorkoutLog{
+		{Status: "skipped", CompletionTime: now.Add(-10 * 24 * time.Hour).Format(time.RFC3339)},
+		{Status: "skipped", CompletionTime: now.Add(-20 * 24 * time.Hour).Format(time.RFC3339)},
+	}
+	app.mu.Unlock()
+
+	checkinResp := doJSON(t, client, http.MethodPost, server.URL+"/api/v1/checkins/weekly", map[string]any{
+		"weight_kg":            85,
+		"energy_level":         3,
+		"availability_changed": false,
+		"equipment_changed":    false,
+		"injury_changed":       false,
+		"note":                 "steady week",
+	}, csrf)
+	if checkinResp.StatusCode != http.StatusOK {
+		t.Fatalf("expected weekly checkin ok, got %d", checkinResp.StatusCode)
+	}
+
+	var payload struct {
+		Regenerated bool   `json:"regenerated"`
+		Reason      string `json:"reason"`
+	}
+	if err := json.NewDecoder(checkinResp.Body).Decode(&payload); err != nil {
+		t.Fatal(err)
+	}
+	if payload.Regenerated {
+		t.Fatalf("expected old skipped workouts to be ignored, got regeneration reason %q", payload.Reason)
 	}
 }
 

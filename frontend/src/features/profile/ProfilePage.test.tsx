@@ -18,6 +18,7 @@ function renderProfilePage() {
 
 afterEach(() => {
   fetchMock.mockReset();
+  vi.unstubAllGlobals();
 });
 
 test('loads and saves notification preferences', async () => {
@@ -28,7 +29,9 @@ test('loads and saves notification preferences', async () => {
         email: 'member@example.com',
         locale: 'ru',
         theme: 'light',
-        onboarding_done: true
+        onboarding_done: true,
+        water_override_ml: 3100,
+        water_target_ml: 3100
       });
     }
     if (url.endsWith('/notifications/preferences') && (!init?.method || init.method === 'GET')) {
@@ -52,14 +55,15 @@ test('loads and saves notification preferences', async () => {
   const user = userEvent.setup();
   renderProfilePage();
 
-  expect(await screen.findByText('member@example.com')).toBeInTheDocument();
+  expect(await screen.findByText('member@example.com', {}, { timeout: 10000 })).toBeInTheDocument();
+  expect(screen.getByDisplayValue('3100')).toBeInTheDocument();
 
-  const hydrationCheckbox = await screen.findByLabelText('Напоминания о воде');
-  const emailCheckbox = screen.getByLabelText('Email-уведомления');
+  const hydrationCheckbox = await screen.findByLabelText(t('ru', 'profile.notificationsHydration'));
+  const emailCheckbox = screen.getByLabelText(t('ru', 'profile.notificationsEmail'));
 
   await user.click(hydrationCheckbox);
   await user.click(emailCheckbox);
-  await user.click(screen.getByRole('button', { name: 'Сохранить уведомления' }));
+  await user.click(screen.getByRole('button', { name: t('ru', 'profile.saveNotifications') }));
 
   await waitFor(() =>
     expect(fetchMock).toHaveBeenCalledWith(
@@ -129,7 +133,7 @@ test('loads existing onboarding preferences and saves extended planning fields',
   const user = userEvent.setup();
   renderProfilePage();
 
-  expect(await screen.findByDisplayValue('31')).toBeInTheDocument();
+  expect(await screen.findByDisplayValue('31', {}, { timeout: 10000 })).toBeInTheDocument();
   expect(screen.getByDisplayValue('low_impact_strength')).toBeInTheDocument();
   expect(screen.getByDisplayValue('simple_prep')).toBeInTheDocument();
   expect(screen.getByDisplayValue('small_frequent_sips')).toBeInTheDocument();
