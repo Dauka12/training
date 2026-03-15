@@ -306,3 +306,53 @@ test('admin can moderate support and discussion threads from the panel', async (
     )
   );
 });
+
+test('admin can trigger external catalog import from the panel', async () => {
+  fetchMock.mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = String(input);
+    if (url.endsWith('/admin/users')) {
+      return Response.json({ items: [] });
+    }
+    if (url.endsWith('/admin/trainers')) {
+      return Response.json({ items: [] });
+    }
+    if (
+      url.endsWith('/admin/support/threads') ||
+      url.endsWith('/admin/discussions/threads') ||
+      url.endsWith('/admin/logs/notifications') ||
+      url.endsWith('/admin/logs/ai') ||
+      url.endsWith('/admin/logs/email') ||
+      url.endsWith('/admin/logs/audit')
+    ) {
+      return Response.json({ items: [] });
+    }
+    if (url.endsWith('/admin/catalog/equipment')) {
+      return Response.json({ items: [{ id: 'eq-1', names: { ru: 'Гантели' }, category: 'weights' }] });
+    }
+    if (url.endsWith('/admin/catalog/exercises')) {
+      return Response.json({ items: [{ id: 'ex-1', names: { ru: 'Bear Walk' }, slug: 'bear-walk' }] });
+    }
+    if (url.endsWith('/admin/catalog/import/wger') && init?.method === 'POST') {
+      return Response.json({ imported: { equipment: 1, exercises: 1 } });
+    }
+    return Response.json({});
+  });
+  vi.stubGlobal('fetch', fetchMock);
+
+  const user = userEvent.setup();
+  renderWithClient(<AdminPage locale="ru" />);
+
+  await screen.findByText('Гантели');
+  await user.click(screen.getByRole('button', { name: t('ru', 'admin.importWger') }));
+
+  await waitFor(() =>
+    expect(fetchMock).toHaveBeenCalledWith(
+      'http://localhost:8080/api/v1/admin/catalog/import/wger',
+      expect.objectContaining({
+        method: 'POST',
+        credentials: 'include',
+        body: JSON.stringify({ limit: 12 })
+      })
+    )
+  );
+});

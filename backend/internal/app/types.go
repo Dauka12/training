@@ -264,6 +264,7 @@ type ExerciseItem struct {
 	Difficulty   string            `json:"difficulty"`
 	LocationType string            `json:"location_type"`
 	EquipmentIDs []string          `json:"equipment_ids"`
+	MediaURL     string            `json:"media_url"`
 	Active       bool              `json:"active"`
 }
 

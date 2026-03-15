@@ -1,8 +1,8 @@
 import type { ReactElement } from 'react';
 import { useMemo } from 'react';
 import { BrowserRouter, Link, MemoryRouter, NavLink, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { Activity, BadgeHelp, ChartNoAxesCombined, CircleUserRound, ClipboardList, House, LayoutDashboard, ShieldCheck, Users } from 'lucide-react';
+import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query';
+import { Activity, BadgeHelp, BellDot, CalendarDays, ChartNoAxesCombined, CircleUserRound, ClipboardList, House, LayoutDashboard, LogOut, ShieldCheck, Users } from 'lucide-react';
 import {
   ForgotPasswordPage,
   LoginPage,
@@ -118,6 +118,10 @@ function Shell({ locale, auth, children }: { locale: SupportedLocale; auth: Auth
   const clear = useAuthStore((state) => state.clear);
   const navigate = useNavigate();
   const location = useLocation();
+  const notifications = useQuery({
+    queryKey: ['shell-notifications'],
+    queryFn: () => apiRequest<{ items: Array<{ read: boolean }> }>('/notifications')
+  });
   const navItems = navigationItems(locale, auth.role);
   const onboardingLocked = auth.role === 'user' && auth.onboardingDone === false;
   const onboardingBlockedPaths = new Set(['/today', '/plan', '/track', '/progress']);
@@ -127,9 +131,12 @@ function Shell({ locale, auth, children }: { locale: SupportedLocale; auth: Auth
     icon: <LayoutDashboard size={18} />
   };
   const dockItems = mobileDockItems(navItems, currentPage);
-  const quickItems = navItems.filter((item) =>
-    ['/today', '/plan', '/track', '/progress', '/support'].includes(item.to)
-  );
+  const unreadNotifications = (notifications.data?.items ?? []).filter((item) => !item.read).length;
+  const currentDateLabel = new Intl.DateTimeFormat(locale === 'kk' ? 'kk-KZ' : 'ru-RU', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long'
+  }).format(new Date());
 
   async function handleLogout() {
     await apiRequest('/auth/logout', { method: 'POST' }).catch(() => undefined);
@@ -157,12 +164,8 @@ function Shell({ locale, auth, children }: { locale: SupportedLocale; auth: Auth
             <span className="shell-brand__mark" aria-hidden="true">
               <LayoutDashboard size={18} />
             </span>
-            <div>
-              <strong>{t(locale, 'brand.name')}</strong>
-              <p className="muted">{t(locale, 'shell.workspace')}</p>
-            </div>
+            <strong>{t(locale, 'brand.name')}</strong>
           </div>
-          <p className="muted">{t(locale, 'shell.subtitle')}</p>
         </section>
 
         <nav className="card shell-card shell-nav workspace-rail__nav" aria-label={t(locale, 'shell.navigation')}>
@@ -180,7 +183,6 @@ function Shell({ locale, auth, children }: { locale: SupportedLocale; auth: Auth
                   <span className="nav-link__icon" aria-hidden="true">{item.icon}</span>
                   <span className="nav-link__content">
                     <span className="nav-link__label">{item.label}</span>
-                    <span className="nav-link__meta">{t(locale, 'profile.onboarding')}</span>
                   </span>
                 </button>
               );
@@ -195,7 +197,6 @@ function Shell({ locale, auth, children }: { locale: SupportedLocale; auth: Auth
                 <span className="nav-link__icon" aria-hidden="true">{item.icon}</span>
                 <span className="nav-link__content">
                   <span className="nav-link__label">{item.label}</span>
-                  <span className="nav-link__meta">{item.to === currentPage.to ? roleLabel(locale, auth.role) : t(locale, 'shell.workspace')}</span>
                 </span>
               </NavLink>
             );
@@ -203,8 +204,7 @@ function Shell({ locale, auth, children }: { locale: SupportedLocale; auth: Auth
         </nav>
 
         <section className="card shell-card shell-account rail-account workspace-rail__account">
-          <span className="muted shell-account__label">{t(locale, 'shell.account')}</span>
-          <strong>{auth.email || t(locale, 'brand.name')}</strong>
+          <strong>{truncateEmail(auth.email || t(locale, 'brand.name'))}</strong>
           <span className="muted">{roleLabel(locale, auth.role)}</span>
           <button type="button" className="button button--ghost button--wide" onClick={() => void handleLogout()}>
             {t(locale, 'common.logout')}
@@ -215,49 +215,29 @@ function Shell({ locale, auth, children }: { locale: SupportedLocale; auth: Auth
       <section className="workspace-shell__main">
         <header className="card workspace-shell__header" data-testid="workspace-header">
           <div className="workspace-shell__headline">
-            <p className="eyebrow">{t(locale, 'shell.workspace')}</p>
-            <p className="workspace-shell__title">{currentPage.label}</p>
-            <p className="muted">{t(locale, 'shell.subtitle')}</p>
-          </div>
-          <div className="workspace-shell__toolbar">
-            <div className="workspace-shell__meta">
-              <span className="badge badge--soft">{roleLabel(locale, auth.role)}</span>
-              <span className="badge">{auth.email || t(locale, 'brand.name')}</span>
+            <div className="workspace-shell__facts">
+              <span className="badge badge--soft">
+                <CalendarDays size={14} aria-hidden="true" />
+                {currentDateLabel}
+              </span>
+              <span className={`badge${unreadNotifications > 0 ? '' : ' badge--soft'}`}>
+                <BellDot size={14} aria-hidden="true" />
+                {unreadNotifications > 0 ? `${unreadNotifications}` : t(locale, 'notifications.title')}
+              </span>
             </div>
-            <nav className="workspace-shell__chips" aria-label={t(locale, 'shell.quickNavigation')}>
-              {quickItems.map((item) => {
-                const locked = onboardingLocked && onboardingBlockedPaths.has(item.to);
-
-                if (locked) {
-                  return (
-                    <button
-                      key={item.to}
-                      type="button"
-                      className="workspace-chip"
-                      onClick={openOnboarding}
-                    >
-                      <span className="workspace-chip__icon" aria-hidden="true">{item.icon}</span>
-                      <span>{item.label}</span>
-                    </button>
-                  );
-                }
-
-                return (
-                  <NavLink
-                    key={item.to}
-                    to={item.to}
-                    className={({ isActive }) => `workspace-chip${isActive ? ' workspace-chip--active' : ''}`}
-                  >
-                    <span className="workspace-chip__icon" aria-hidden="true">{item.icon}</span>
-                    <span>{item.label}</span>
-                  </NavLink>
-                );
-              })}
-            </nav>
+            <p className="workspace-shell__title">{currentPage.label}</p>
+          </div>
+          <div className="workspace-shell__toolbar workspace-shell__toolbar--inline">
+            <span className="badge badge--soft">{roleLabel(locale, auth.role)}</span>
+            <span className="badge badge--soft">{truncateEmail(auth.email || t(locale, 'brand.name'))}</span>
+            <button type="button" className="button button--ghost" onClick={() => void handleLogout()}>
+              <LogOut size={16} aria-hidden="true" />
+              <span>{t(locale, 'common.logout')}</span>
+            </button>
           </div>
         </header>
         <div className="workspace-shell__content">{children}</div>
-        <nav className="mobile-dock" aria-label={`${t(locale, 'shell.quickNavigation')} mobile`}>
+        <nav className="mobile-dock" aria-label={t(locale, 'shell.quickNavigation')}>
           {dockItems.map((item) => {
             const locked = onboardingLocked && onboardingBlockedPaths.has(item.to);
 
@@ -290,6 +270,13 @@ function Shell({ locale, auth, children }: { locale: SupportedLocale; auth: Auth
       </section>
     </main>
   );
+}
+
+function truncateEmail(value: string) {
+  if (value.length <= 28) {
+    return value;
+  }
+  return `${value.slice(0, 25)}...`;
 }
 
 function LandingPage({ locale }: { locale: SupportedLocale }) {

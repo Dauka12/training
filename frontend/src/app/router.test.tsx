@@ -79,7 +79,7 @@ test('renders workspace shell with account summary for authenticated user', () =
   expect(screen.getByTestId('workspace-sidebar')).toBeInTheDocument();
   expect(screen.getByTestId('workspace-header')).toBeInTheDocument();
   expect(screen.getAllByText('member@example.com').length).toBeGreaterThan(0);
-  expect(screen.getAllByText(t('ru', 'shell.workspace')).length).toBeGreaterThan(0);
+  expect(screen.getAllByText(t('ru', 'nav.today')).length).toBeGreaterThan(0);
   expect(screen.getAllByRole('link', { name: t('ru', 'nav.today') }).length).toBeGreaterThan(0);
 });
 

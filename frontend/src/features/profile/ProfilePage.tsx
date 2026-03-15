@@ -404,6 +404,7 @@ export function ProfilePage({ locale }: { locale: SupportedLocale }) {
               onChange={(value) => setPreferences((current) => ({ ...current, water_override_ml: value }))}
               type="number"
               inputMode="numeric"
+              hint={t(locale, 'profile.hint.waterOverride')}
             />
             <div className="button-row">
               <button type="button" className="button button--primary" onClick={() => savePreferences.mutate()}>
@@ -489,11 +490,11 @@ export function ProfilePage({ locale }: { locale: SupportedLocale }) {
             {activeStepCard.id === 'goals' ? (
               <div className="form-grid">
                 <SelectField label={t(locale, 'profile.goal')} value={profile.primary_goal} onChange={(value) => setProfile((current) => ({ ...current, primary_goal: value }))} options={goalOptions} />
-                <SelectField label={t(locale, 'profile.duration')} value={profile.program_duration_weeks} onChange={(value) => setProfile((current) => ({ ...current, program_duration_weeks: value }))} options={durationSelectOptions} />
+                <SelectField label={t(locale, 'profile.duration')} value={profile.program_duration_weeks} onChange={(value) => setProfile((current) => ({ ...current, program_duration_weeks: value }))} options={durationSelectOptions} hint={t(locale, 'profile.hint.duration')} />
                 <SelectField label={t(locale, 'profile.experience')} value={profile.experience_level} onChange={(value) => setProfile((current) => ({ ...current, experience_level: value }))} options={experienceOptions} />
                 <SelectField label={t(locale, 'profile.activity')} value={profile.activity_level} onChange={(value) => setProfile((current) => ({ ...current, activity_level: value }))} options={activityOptions} />
                 <SelectField label={t(locale, 'profile.location')} value={profile.training_location} onChange={(value) => setProfile((current) => ({ ...current, training_location: value }))} options={locationOptions} />
-                <SelectField label={t(locale, 'profile.timezone')} value={profile.timezone} onChange={(value) => setProfile((current) => ({ ...current, timezone: value }))} options={timezoneOptions} />
+                <SelectField label={t(locale, 'profile.timezone')} value={profile.timezone} onChange={(value) => setProfile((current) => ({ ...current, timezone: value }))} options={timezoneOptions} hint={t(locale, 'profile.hint.timezone')} />
               </div>
             ) : null}
 
@@ -603,9 +604,9 @@ export function ProfilePage({ locale }: { locale: SupportedLocale }) {
             {activeStepCard.id === 'preferences' ? (
               <div className="stack">
                 <div className="form-grid">
-                  <SelectField label={t(locale, 'profile.trainingStyle')} value={profile.preferred_training_style} onChange={(value) => setProfile((current) => ({ ...current, preferred_training_style: value }))} options={trainingStyleOptions} />
-                  <SelectField label={t(locale, 'profile.mealStyle')} value={profile.preferred_meal_style} onChange={(value) => setProfile((current) => ({ ...current, preferred_meal_style: value }))} options={mealStyleOptions} />
-                  <SelectField label={t(locale, 'profile.hydrationPreference')} value={profile.hydration_preference} onChange={(value) => setProfile((current) => ({ ...current, hydration_preference: value }))} options={hydrationOptions} />
+                  <SelectField label={t(locale, 'profile.trainingStyle')} value={profile.preferred_training_style} onChange={(value) => setProfile((current) => ({ ...current, preferred_training_style: value }))} options={trainingStyleOptions} hint={t(locale, 'profile.hint.trainingStyle')} />
+                  <SelectField label={t(locale, 'profile.mealStyle')} value={profile.preferred_meal_style} onChange={(value) => setProfile((current) => ({ ...current, preferred_meal_style: value }))} options={mealStyleOptions} hint={t(locale, 'profile.hint.mealStyle')} />
+                  <SelectField label={t(locale, 'profile.hydrationPreference')} value={profile.hydration_preference} onChange={(value) => setProfile((current) => ({ ...current, hydration_preference: value }))} options={hydrationOptions} hint={t(locale, 'profile.hint.hydration')} />
                 </div>
                 <div className="form-grid form-grid--single">
                   <TextAreaField label={t(locale, 'profile.injuries')} value={profile.injuries} onChange={(value) => setProfile((current) => ({ ...current, injuries: value }))} />

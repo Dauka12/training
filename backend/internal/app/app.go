@@ -29,6 +29,7 @@ type App struct {
 	auditLogs         []AuditLog
 	frontendURL       string
 	googleAuth        GoogleAuthProvider
+	catalogImporter   CatalogImporter
 }
 
 type Option func(*App)
@@ -87,6 +88,14 @@ func WithGoogleAuthProvider(provider GoogleAuthProvider) Option {
 	}
 }
 
+func WithCatalogImporter(importer CatalogImporter) Option {
+	return func(app *App) {
+		if importer != nil {
+			app.catalogImporter = importer
+		}
+	}
+}
+
 func New(logger *slog.Logger, options ...Option) *App {
 	app := &App{
 		log:               logger,
@@ -102,6 +111,7 @@ func New(logger *slog.Logger, options ...Option) *App {
 		allowedOrigins:    []string{"http://localhost:5173"},
 		clock:             RealClock{},
 		frontendURL:       "http://localhost:5173",
+		catalogImporter:   NewWgerCatalogImporter(nil, ""),
 	}
 	for _, option := range options {
 		option(app)
@@ -146,6 +156,7 @@ func (a *App) Routes() http.Handler {
 	mux.HandleFunc("/api/v1/admin/trainers/assign", a.withAuth(a.withRoles(a.handleAssignTrainer, "admin")))
 	mux.HandleFunc("/api/v1/admin/catalog/equipment", a.withAuth(a.withRoles(a.handleAdminEquipment, "admin")))
 	mux.HandleFunc("/api/v1/admin/catalog/exercises", a.withAuth(a.withRoles(a.handleAdminExercises, "admin")))
+	mux.HandleFunc("/api/v1/admin/catalog/import/wger", a.withAuth(a.withRoles(a.handleAdminWgerImport, "admin")))
 	mux.HandleFunc("/api/v1/admin/logs/ai", a.withAuth(a.withRoles(a.handleAdminAILogs, "admin")))
 	mux.HandleFunc("/api/v1/admin/logs/email", a.withAuth(a.withRoles(a.handleAdminEmailLogs, "admin")))
 	mux.HandleFunc("/api/v1/admin/logs/audit", a.withAuth(a.withRoles(a.handleAdminAuditLogs, "admin")))

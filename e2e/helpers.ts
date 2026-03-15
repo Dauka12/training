@@ -29,11 +29,11 @@ export async function login(page: Page, email: string, password: string) {
   await page.getByLabel(t(locale, 'auth.email')).fill(email);
   await page.getByLabel(t(locale, 'auth.password')).fill(password);
   await page.getByRole('button', { name: t(locale, 'auth.login.submit') }).click();
-  await expect(page.getByRole('button', { name: t(locale, 'common.logout') })).toBeVisible();
+  await expect(page.getByTestId('workspace-header').getByRole('button', { name: t(locale, 'common.logout') })).toBeVisible();
 }
 
 export async function logout(page: Page) {
-  await page.getByRole('button', { name: t(locale, 'common.logout') }).click();
+  await page.getByTestId('workspace-header').getByRole('button', { name: t(locale, 'common.logout') }).click();
   await expect(page.getByRole('heading', { name: t(locale, 'auth.login.title') })).toBeVisible();
 }
 

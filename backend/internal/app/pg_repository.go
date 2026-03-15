@@ -585,7 +585,7 @@ func projectCatalogs(ctx context.Context, tx pgx.Tx, state runtimeState, _ proje
 		if _, err := tx.Exec(ctx, `
 			INSERT INTO exercise_catalog (id, slug, movement_pattern, difficulty, location_type, media_url, active)
 			VALUES ($1, $2, $3, $4, $5, $6, $7)
-		`, exerciseID, fallbackString(item.Slug, projectSlug(translatedValue("ru", item.Names), item.ID)), item.Movement, item.Difficulty, item.LocationType, "", item.Active); err != nil {
+		`, exerciseID, fallbackString(item.Slug, projectSlug(translatedValue("ru", item.Names), item.ID)), item.Movement, item.Difficulty, item.LocationType, item.MediaURL, item.Active); err != nil {
 			return fmt.Errorf("insert exercise catalog: %w", err)
 		}
 		for _, locale := range []string{"ru", "kk"} {
@@ -608,7 +608,7 @@ func projectCatalogs(ctx context.Context, tx pgx.Tx, state runtimeState, _ proje
 		if _, err := tx.Exec(ctx, `
 			INSERT INTO exercise_media (id, exercise_id, media_url, media_type)
 			VALUES ($1, $2, $3, $4)
-		`, runtimeUUID("exercise-media", item.ID), exerciseID, "https://example.com/media/"+fallbackString(item.Slug, item.ID), "image"); err != nil {
+		`, runtimeUUID("exercise-media", item.ID), exerciseID, fallbackString(item.MediaURL, "https://example.com/media/"+fallbackString(item.Slug, item.ID)), "image"); err != nil {
 			return fmt.Errorf("insert exercise media: %w", err)
 		}
 	}

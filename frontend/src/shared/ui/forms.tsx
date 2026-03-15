@@ -29,7 +29,8 @@ export function Field({
   min,
   max,
   step,
-  autoComplete
+  autoComplete,
+  hint
 }: {
   label: string;
   value: string;
@@ -41,6 +42,7 @@ export function Field({
   max?: number | string;
   step?: number | string;
   autoComplete?: string;
+  hint?: string;
 }) {
   return (
     <label className="field">
@@ -57,6 +59,7 @@ export function Field({
         autoComplete={autoComplete}
         onChange={(event) => onChange(event.target.value)}
       />
+      {hint ? <small className="field__hint">{hint}</small> : null}
     </label>
   );
 }
@@ -66,13 +69,15 @@ export function SelectField({
   value,
   onChange,
   options,
-  disabled = false
+  disabled = false,
+  hint
 }: {
   label: string;
   value: string;
   onChange: (value: string) => void;
   options: Array<{ value: string; label: string }>;
   disabled?: boolean;
+  hint?: string;
 }) {
   return (
     <label className="field">
@@ -87,6 +92,7 @@ export function SelectField({
         </select>
         <ChevronDown aria-hidden="true" className="select-shell__icon" size={18} />
       </div>
+      {hint ? <small className="field__hint">{hint}</small> : null}
     </label>
   );
 }
@@ -95,17 +101,20 @@ export function TextAreaField({
   label,
   value,
   onChange,
-  placeholder
+  placeholder,
+  hint
 }: {
   label: string;
   value: string;
   onChange: (value: string) => void;
   placeholder?: string;
+  hint?: string;
 }) {
   return (
     <label className="field">
       <span>{label}</span>
       <textarea aria-label={label} value={value} placeholder={placeholder} onChange={(event) => onChange(event.target.value)} />
+      {hint ? <small className="field__hint">{hint}</small> : null}
     </label>
   );
 }

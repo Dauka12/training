@@ -344,6 +344,19 @@ export function AdminPage({ locale }: { locale: SupportedLocale }) {
     }
   });
 
+  const importCatalog = useMutation({
+    mutationFn: () =>
+      apiRequest('/admin/catalog/import/wger', {
+        method: 'POST',
+        body: JSON.stringify({ limit: 12 })
+      }),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['admin-equipment'] });
+      await queryClient.invalidateQueries({ queryKey: ['admin-exercises'] });
+      await queryClient.invalidateQueries({ queryKey: ['admin-audit-logs'] });
+    }
+  });
+
   return (
     <div className="page-stack page-stack--ops">
       <section className="card card--panel ops-hero">
@@ -445,6 +458,12 @@ export function AdminPage({ locale }: { locale: SupportedLocale }) {
       <section className="ops-grid ops-grid--admin">
         <section className="card card--panel ops-panel">
           <h2>{t(locale, 'admin.equipment')}</h2>
+          <p className="muted">{t(locale, 'admin.importHint')}</p>
+          <div className="button-row">
+            <button type="button" className="button button--ghost" onClick={() => importCatalog.mutate()}>
+              {t(locale, 'admin.importWger')}
+            </button>
+          </div>
           <Field label={t(locale, 'admin.addEquipment')} value={equipmentName} onChange={setEquipmentName} />
           <div className="button-row">
             <button

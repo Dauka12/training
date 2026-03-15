@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { useStore } from 'zustand';
-import { Languages, MoonStar, PlaySquare, Search, SunMedium } from 'lucide-react';
+import { Dumbbell, Languages, MoonStar, Search, SunMedium } from 'lucide-react';
 import { BrowserAppRouter } from './router';
 import { apiRequest } from '../shared/api/client';
 import { useAuthStore } from '../shared/auth/store';
@@ -73,11 +73,10 @@ export function App() {
       <header className="topbar">
         <div className="topbar__brand">
           <div className="topbar__brand-mark" aria-hidden="true">
-            <PlaySquare size={18} />
+            <Dumbbell size={18} />
           </div>
           <div>
             <strong>{t(locale, 'brand.name')}</strong>
-            <span className="muted">{t(locale, 'shell.workspace')}</span>
           </div>
         </div>
         <div className="topbar__center">

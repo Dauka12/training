@@ -391,6 +391,46 @@ func (a *App) handleAdminExercises(w http.ResponseWriter, r *http.Request, user 
 	}
 }
 
+func (a *App) handleAdminWgerImport(w http.ResponseWriter, r *http.Request, user *User) {
+	if r.Method != http.MethodPost {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+	if a.catalogImporter == nil {
+		writeError(w, http.StatusServiceUnavailable, "catalog_import_unavailable", "Catalog import unavailable")
+		return
+	}
+
+	var req struct {
+		Limit int `json:"limit"`
+	}
+	if !decodeJSON(w, r, &req) {
+		return
+	}
+
+	equipment, exercises, err := a.catalogImporter.ImportWger(r.Context(), req.Limit)
+	if err != nil {
+		a.log.Error("catalog import failed", "error", err)
+		writeError(w, http.StatusBadGateway, "catalog_import_failed", "Catalog import failed")
+		return
+	}
+
+	a.mu.Lock()
+	importedEquipment := mergeImportedEquipment(&a.equipmentCatalog, equipment)
+	importedExercises := mergeImportedExercises(&a.exerciseCatalog, exercises)
+	a.recordAuditLocked(user.Email, "import_catalog_wger", "catalog", "wger")
+	a.persistStateLocked()
+	a.mu.Unlock()
+
+	writeJSON(w, http.StatusOK, map[string]any{
+		"status": "ok",
+		"imported": map[string]int{
+			"equipment": importedEquipment,
+			"exercises": importedExercises,
+		},
+	})
+}
+
 func (a *App) handleAdminNotificationLogs(w http.ResponseWriter, r *http.Request, _ *User) {
 	if r.Method != http.MethodGet {
 		w.WriteHeader(http.StatusMethodNotAllowed)
@@ -843,6 +883,7 @@ func seedExerciseCatalog() []ExerciseItem {
 			Difficulty:   "beginner",
 			LocationType: "mixed",
 			EquipmentIDs: []string{"10000000-0000-0000-0000-000000000001"},
+			MediaURL:     "https://images.unsplash.com/photo-1517838277536-f5f99be501cd?auto=format&fit=crop&w=900&q=80",
 			Active:       true,
 		},
 		{
@@ -863,7 +904,100 @@ func seedExerciseCatalog() []ExerciseItem {
 			Movement:     "push",
 			Difficulty:   "beginner",
 			LocationType: "home",
+			MediaURL:     "https://images.unsplash.com/photo-1598971639058-999dd0d1f8b8?auto=format&fit=crop&w=900&q=80",
 			Active:       true,
 		},
 	}
+}
+
+func mergeImportedEquipment(target *[]EquipmentItem, imported []ImportedEquipment) int {
+	if len(imported) == 0 {
+		return 0
+	}
+
+	existing := make(map[string]int, len(*target))
+	for index, item := range *target {
+		existing[item.ID] = index
+	}
+
+	importedCount := 0
+	for _, item := range imported {
+		candidate := EquipmentItem{
+			ID: item.SourceID,
+			Names: map[string]string{
+				"ru": item.Name,
+				"kk": item.Name,
+				"en": item.Name,
+			},
+			Descriptions: map[string]string{
+				"ru": fallbackString(item.Description, item.Name),
+				"kk": fallbackString(item.Description, item.Name),
+				"en": fallbackString(item.Description, item.Name),
+			},
+			Category:     fallbackString(item.Category, "imported"),
+			LocationType: fallbackString(item.LocationType, "mixed"),
+			Active:       true,
+		}
+		if index, ok := existing[candidate.ID]; ok {
+			(*target)[index] = candidate
+			continue
+		}
+		*target = append(*target, candidate)
+		existing[candidate.ID] = len(*target) - 1
+		importedCount++
+	}
+
+	return importedCount
+}
+
+func mergeImportedExercises(target *[]ExerciseItem, imported []ImportedExercise) int {
+	if len(imported) == 0 {
+		return 0
+	}
+
+	existing := make(map[string]int, len(*target))
+	for index, item := range *target {
+		existing[item.ID] = index
+	}
+
+	importedCount := 0
+	for _, item := range imported {
+		name := fallbackString(item.NameEN, item.Slug)
+		description := fallbackString(item.DescriptionEN, name)
+		technique := fallbackString(item.TechniqueEN, description)
+		candidate := ExerciseItem{
+			ID:   item.SourceID,
+			Slug: fallbackString(item.Slug, slugify(name)),
+			Names: map[string]string{
+				"ru": name,
+				"kk": name,
+				"en": name,
+			},
+			Descriptions: map[string]string{
+				"ru": description,
+				"kk": description,
+				"en": description,
+			},
+			Technique: map[string]string{
+				"ru": technique,
+				"kk": technique,
+				"en": technique,
+			},
+			Movement:     fallbackString(item.Movement, "general"),
+			Difficulty:   fallbackString(item.Difficulty, "beginner"),
+			LocationType: fallbackString(item.LocationType, "mixed"),
+			EquipmentIDs: append([]string(nil), item.EquipmentIDs...),
+			MediaURL:     item.MediaURL,
+			Active:       true,
+		}
+		if index, ok := existing[candidate.ID]; ok {
+			(*target)[index] = candidate
+			continue
+		}
+		*target = append(*target, candidate)
+		existing[candidate.ID] = len(*target) - 1
+		importedCount++
+	}
+
+	return importedCount
 }

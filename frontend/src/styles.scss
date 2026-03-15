@@ -1,18 +1,18 @@
 :root {
   color-scheme: light;
-  --bg: #f9f9f9;
-  --bg-elevated: #f2f2f2;
+  --bg: #f6f8f6;
+  --bg-elevated: #edf2ee;
   --surface: #ffffff;
-  --surface-soft: #f7f7f7;
-  --surface-strong: #efefef;
+  --surface-soft: #f3f7f4;
+  --surface-strong: #e8eee9;
   --text: #0f0f0f;
-  --text-soft: #606060;
-  --text-faint: #7a7a7a;
-  --border: #e3e3e3;
-  --border-strong: #d0d0d0;
-  --accent: #e11d48;
-  --accent-strong: #be123c;
-  --accent-soft: #fee2e8;
+  --text-soft: #57625b;
+  --text-faint: #748077;
+  --border: #dbe5de;
+  --border-strong: #c4d3c8;
+  --accent: #14804a;
+  --accent-strong: #0f6a3d;
+  --accent-soft: #dff5e8;
   --accent-text: #ffffff;
   --success: #0f9d58;
   --warning: #b45309;
@@ -29,19 +29,19 @@
 
 [data-theme='dark'] {
   color-scheme: dark;
-  --bg: #0f0f0f;
-  --bg-elevated: #161616;
-  --surface: #1a1a1a;
-  --surface-soft: #222222;
-  --surface-strong: #2a2a2a;
-  --text: #f1f1f1;
-  --text-soft: #c6c6c6;
-  --text-faint: #9c9c9c;
-  --border: #323232;
-  --border-strong: #454545;
-  --accent: #ff4d67;
-  --accent-strong: #ff6b81;
-  --accent-soft: rgba(255, 77, 103, 0.16);
+  --bg: #0d1410;
+  --bg-elevated: #111a14;
+  --surface: #17201a;
+  --surface-soft: #1e2a22;
+  --surface-strong: #26352c;
+  --text: #edf6ef;
+  --text-soft: #bfd0c4;
+  --text-faint: #8ea193;
+  --border: #304238;
+  --border-strong: #3f5548;
+  --accent: #2ec27e;
+  --accent-strong: #50d996;
+  --accent-soft: rgba(46, 194, 126, 0.16);
   --accent-text: #ffffff;
   --success: #3fb970;
   --warning: #f59e0b;
@@ -1802,5 +1802,145 @@ body {
 
   .stats-grid--hero {
     grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+.topbar {
+  padding-block: 0.8rem;
+  background: color-mix(in srgb, var(--bg) 78%, var(--surface));
+  box-shadow: 0 10px 30px rgba(15, 15, 15, 0.05);
+}
+
+.topbar__brand > div:last-child {
+  gap: 0;
+}
+
+.topbar__brand strong {
+  font-size: 1.08rem;
+  font-weight: 700;
+}
+
+.topbar__search {
+  min-height: 50px;
+  border-color: var(--border-strong);
+  background: color-mix(in srgb, var(--surface-soft) 86%, var(--surface));
+}
+
+.field__hint {
+  margin: 0;
+  color: var(--text-faint);
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
+.select-shell {
+  min-height: 52px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--surface-soft) 82%, var(--surface));
+  transition:
+    border-color 0.18s ease,
+    box-shadow 0.18s ease,
+    background-color 0.18s ease;
+}
+
+.select-shell:focus-within {
+  border-color: color-mix(in srgb, var(--accent) 66%, var(--border));
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 16%, transparent);
+}
+
+.select-shell select {
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.select-shell select:focus {
+  border-color: transparent;
+  box-shadow: none;
+}
+
+.nav-link__meta {
+  display: none;
+}
+
+.shell-card--brand {
+  padding-block: 1rem;
+}
+
+.shell-account {
+  align-content: start;
+}
+
+.shell-account strong {
+  font-size: 0.98rem;
+  line-height: 1.35;
+  word-break: break-word;
+}
+
+.workspace-shell__header {
+  position: relative;
+  top: 0;
+  z-index: 1;
+  padding: 1rem 1.15rem;
+}
+
+.workspace-shell__facts {
+  display: flex;
+  gap: 0.55rem;
+  flex-wrap: wrap;
+}
+
+.workspace-shell__toolbar--inline {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  flex-wrap: wrap;
+}
+
+.support-layout {
+  grid-template-areas:
+    'composer'
+    'feed'
+    'guidance';
+}
+
+.support-composer {
+  grid-area: composer;
+}
+
+.support-feed {
+  grid-area: feed;
+}
+
+.support-guidance {
+  grid-area: guidance;
+}
+
+.feed-card {
+  padding: 1rem;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+}
+
+.feed-card__header {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  align-items: flex-start;
+}
+
+@media (min-width: 980px) {
+  .workspace-shell__header {
+    grid-template-columns: minmax(0, 1.1fr) minmax(320px, 0.9fr);
+    align-items: start;
+  }
+
+  .support-layout {
+    grid-template-columns: minmax(0, 1.18fr) minmax(320px, 0.82fr);
+    grid-template-areas:
+      'feed composer'
+      'feed guidance';
+    align-items: start;
   }
 }
