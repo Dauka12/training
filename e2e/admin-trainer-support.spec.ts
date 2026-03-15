@@ -33,13 +33,19 @@ test('admin can assign trainer and trainer can review user and create support no
   await page.goto('/support');
   await page.getByLabel('Тема').first().fill('Нужна помощь');
   await page.getByLabel('Сообщение').first().fill('Болит колено после тренировки');
-  await page.getByRole('button', { name: 'Создать тикет' }).click();
+  await Promise.all([
+    page.waitForResponse((response) => response.url().endsWith('/api/v1/support/threads') && response.ok()),
+    page.getByRole('button', { name: 'Создать тикет' }).click()
+  ]);
   await expect(page.getByText('Нужна помощь')).toBeVisible();
 
   await page.getByLabel('Тема').nth(1).fill('Завтраки');
   await page.getByLabel('Категория').fill('nutrition');
   await page.getByLabel('Сообщение').nth(1).fill('Какие быстрые завтраки подойдут?');
-  await page.getByRole('button', { name: 'Создать обсуждение' }).click();
+  await Promise.all([
+    page.waitForResponse((response) => response.url().endsWith('/api/v1/discussions/threads') && response.ok()),
+    page.getByRole('button', { name: 'Создать обсуждение' }).click()
+  ]);
   await expect(page.getByText('Завтраки')).toBeVisible();
 
   await logout(page);
@@ -54,12 +60,18 @@ test('admin can assign trainer and trainer can review user and create support no
   const supportThread = page.locator('article').filter({ hasText: 'Нужна помощь' }).first();
   await expect(supportThread).toBeVisible();
   await supportThread.getByPlaceholder('Ответ').fill('Снизьте нагрузку на этой неделе');
-  await supportThread.getByRole('button', { name: 'Ответить' }).click();
+  await Promise.all([
+    page.waitForResponse((response) => response.url().includes('/api/v1/support/threads/') && response.url().endsWith('/messages') && response.ok()),
+    supportThread.getByRole('button', { name: 'Ответить' }).click()
+  ]);
 
   const discussionThread = page.locator('article').filter({ hasText: 'Завтраки' }).first();
   await expect(discussionThread).toBeVisible();
   await discussionThread.getByPlaceholder('Ответ').fill('Попробуйте овсянку и яйца');
-  await discussionThread.getByRole('button', { name: 'Ответить' }).click();
+  await Promise.all([
+    page.waitForResponse((response) => response.url().includes('/api/v1/discussions/threads/') && response.url().endsWith('/replies') && response.ok()),
+    discussionThread.getByRole('button', { name: 'Ответить' }).click()
+  ]);
 
   await logout(page);
   await login(page, email, password);

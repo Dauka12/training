@@ -37,6 +37,8 @@ export async function logout(page: Page) {
 
 export async function saveDefaultOnboarding(page: Page) {
   await page.goto('/profile');
+  await page.waitForLoadState('networkidle');
+  await expect(page.getByRole('heading', { name: 'Профиль и настройки' })).toBeVisible();
 
   await page.getByLabel('Возраст').fill('28');
   await page.getByLabel('Биологический пол').fill('male');
