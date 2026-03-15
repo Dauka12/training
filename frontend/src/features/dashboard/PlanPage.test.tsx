@@ -79,6 +79,9 @@ test('renders detailed weeks, nutrition notes, meal examples and adaptation rule
   renderPlanPage();
 
   expect(await screen.findByText('Plan title')).toBeInTheDocument();
+  expect(screen.getByTestId('plan-layout')).toBeInTheDocument();
+  expect(screen.getByTestId('plan-overview')).toBeInTheDocument();
+  expect(screen.getByTestId('plan-feed')).toBeInTheDocument();
   expect(screen.getByText('Use more carbs around training')).toBeInTheDocument();
   expect(screen.getByText('Oats + eggs, Yogurt + berries')).toBeInTheDocument();
   expect(screen.getByText(/Strength base/)).toBeInTheDocument();

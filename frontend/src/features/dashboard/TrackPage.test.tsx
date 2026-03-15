@@ -52,6 +52,9 @@ test('track page exposes detailed workout logging controls and weekly hydration 
   renderTrackPage();
 
   expect(await screen.findByRole('heading', { name: t('ru', 'track.title') })).toBeInTheDocument();
+  expect(screen.getByTestId('tracker-layout')).toBeInTheDocument();
+  expect(screen.getByTestId('tracker-primary')).toBeInTheDocument();
+  expect(screen.getByTestId('tracker-secondary')).toBeInTheDocument();
   expect(screen.getByLabelText(t('ru', 'track.workout.session'))).toBeInTheDocument();
   expect(screen.getByLabelText(t('ru', 'track.workout.status'))).toBeInTheDocument();
   expect(screen.getByLabelText(t('ru', 'track.workout.discomfort'))).toBeInTheDocument();

@@ -3,6 +3,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, expect, test, vi } from 'vitest';
 import { ProfilePage } from './ProfilePage';
+import { useAuthStore } from '../../shared/auth/store';
 import { t } from '../../shared/i18n';
 
 const fetchMock = vi.fn();
@@ -19,6 +20,7 @@ function renderProfilePage() {
 afterEach(() => {
   fetchMock.mockReset();
   vi.unstubAllGlobals();
+  useAuthStore.getState().clear();
 });
 
 test('loads and saves notification preferences', async () => {
@@ -56,7 +58,7 @@ test('loads and saves notification preferences', async () => {
   renderProfilePage();
 
   expect(await screen.findByText('member@example.com', {}, { timeout: 10000 })).toBeInTheDocument();
-  expect(screen.getByDisplayValue('3100')).toBeInTheDocument();
+  await waitFor(() => expect(screen.getByLabelText(t('ru', 'profile.waterOverride'))).toHaveValue(3100));
 
   const hydrationCheckbox = await screen.findByLabelText(t('ru', 'profile.notificationsHydration'));
   const emailCheckbox = screen.getByLabelText(t('ru', 'profile.notificationsEmail'));
@@ -83,7 +85,13 @@ test('loads and saves notification preferences', async () => {
   expect(String(notificationCall?.[1]?.body)).toContain('"email_enabled":true');
 });
 
-test('loads existing onboarding preferences and saves extended planning fields', async () => {
+test('loads existing onboarding preferences and saves extended planning fields through a stepped flow', async () => {
+  useAuthStore.getState().setAuthenticated({
+    role: 'user',
+    email: 'member@example.com',
+    onboardingDone: false
+  });
+
   fetchMock.mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input);
     if (url.endsWith('/me')) {
@@ -91,7 +99,7 @@ test('loads existing onboarding preferences and saves extended planning fields',
         email: 'member@example.com',
         locale: 'ru',
         theme: 'dark',
-        onboarding_done: true,
+        onboarding_done: false,
         profile: {
           age: 31,
           biological_sex: 'female',
@@ -115,6 +123,26 @@ test('loads existing onboarding preferences and saves extended planning fields',
         }
       });
     }
+    if (url.endsWith('/catalog/equipment')) {
+      return Response.json({
+        items: [
+          {
+            id: '10000000-0000-0000-0000-000000000001',
+            names: { ru: 'Гантели', kk: 'Gantel' },
+            descriptions: { ru: 'Свободные веса', kk: 'Erkin salmaq' },
+            category: 'weights',
+            location_type: 'mixed'
+          },
+          {
+            id: '10000000-0000-0000-0000-000000000002',
+            names: { ru: 'Коврик', kk: 'Tosek' },
+            descriptions: { ru: 'Для домашних сессий', kk: 'Ui zhattyguyna' },
+            category: 'recovery',
+            location_type: 'home'
+          }
+        ]
+      });
+    }
     if (url.endsWith('/notifications/preferences') && (!init?.method || init.method === 'GET')) {
       return Response.json({
         preferences: {
@@ -133,17 +161,32 @@ test('loads existing onboarding preferences and saves extended planning fields',
   const user = userEvent.setup();
   renderProfilePage();
 
-  expect(await screen.findByDisplayValue('31', {}, { timeout: 10000 })).toBeInTheDocument();
-  expect(screen.getByDisplayValue('low_impact_strength')).toBeInTheDocument();
-  expect(screen.getByDisplayValue('simple_prep')).toBeInTheDocument();
-  expect(screen.getByDisplayValue('small_frequent_sips')).toBeInTheDocument();
+  expect(await screen.findByText('member@example.com', {}, { timeout: 10000 })).toBeInTheDocument();
+  expect(screen.getByRole('heading', { name: t('ru', 'profile.step.basics') })).toBeInTheDocument();
+  expect(screen.queryByRole('textbox', { name: t('ru', 'profile.equipment') })).not.toBeInTheDocument();
+  expect(screen.queryByRole('textbox', { name: t('ru', 'profile.days') })).not.toBeInTheDocument();
 
-  await user.clear(screen.getByLabelText(t('ru', 'profile.trainingStyle')));
-  await user.type(screen.getByLabelText(t('ru', 'profile.trainingStyle')), 'strength_endurance');
-  await user.clear(screen.getByLabelText(t('ru', 'profile.mealStyle')));
-  await user.type(screen.getByLabelText(t('ru', 'profile.mealStyle')), 'family_style');
-  await user.clear(screen.getByLabelText(t('ru', 'profile.hydrationPreference')));
-  await user.type(screen.getByLabelText(t('ru', 'profile.hydrationPreference')), 'large_bottles');
+  await user.click(screen.getByRole('button', { name: t('ru', 'common.next') }));
+  expect(screen.getByRole('heading', { name: t('ru', 'profile.step.goals') })).toBeInTheDocument();
+  expect(screen.getByRole('combobox', { name: t('ru', 'profile.duration') })).toBeInTheDocument();
+  expect(screen.getByRole('combobox', { name: t('ru', 'profile.timezone') })).toBeInTheDocument();
+
+  await user.click(screen.getByRole('button', { name: t('ru', 'common.next') }));
+  expect(screen.getByRole('heading', { name: t('ru', 'profile.step.setup') })).toBeInTheDocument();
+  expect(await screen.findByRole('checkbox', { name: 'Гантели' }, { timeout: 10000 })).toBeChecked();
+  await user.click(screen.getByRole('checkbox', { name: 'Коврик' }));
+  await user.click(screen.getByRole('checkbox', { name: t('ru', 'weekday.thursday') }));
+  await user.selectOptions(screen.getByLabelText(`${t('ru', 'weekday.thursday')} ${t('ru', 'plan.duration')}`), '60');
+
+  await user.click(screen.getByRole('button', { name: t('ru', 'common.next') }));
+  expect(screen.getByRole('heading', { name: t('ru', 'profile.step.preferences') })).toBeInTheDocument();
+  expect(screen.getByRole('combobox', { name: t('ru', 'profile.trainingStyle') })).toBeInTheDocument();
+  expect(screen.getByRole('combobox', { name: t('ru', 'profile.mealStyle') })).toBeInTheDocument();
+  expect(screen.getByRole('combobox', { name: t('ru', 'profile.hydrationPreference') })).toBeInTheDocument();
+
+  await user.selectOptions(screen.getByRole('combobox', { name: t('ru', 'profile.trainingStyle') }), 'strength_endurance');
+  await user.selectOptions(screen.getByRole('combobox', { name: t('ru', 'profile.mealStyle') }), 'family_style');
+  await user.selectOptions(screen.getByRole('combobox', { name: t('ru', 'profile.hydrationPreference') }), 'large_bottles');
   await user.click(screen.getByRole('button', { name: t('ru', 'profile.saveOnboarding') }));
 
   await waitFor(() =>
@@ -163,4 +206,9 @@ test('loads existing onboarding preferences and saves extended planning fields',
   expect(String(onboardingCall?.[1]?.body)).toContain('"preferred_training_style":"strength_endurance"');
   expect(String(onboardingCall?.[1]?.body)).toContain('"preferred_meal_style":"family_style"');
   expect(String(onboardingCall?.[1]?.body)).toContain('"hydration_preference":"large_bottles"');
+  expect(String(onboardingCall?.[1]?.body)).toContain('"equipment_ids":["10000000-0000-0000-0000-000000000001","10000000-0000-0000-0000-000000000002"]');
+  expect(String(onboardingCall?.[1]?.body)).toContain('"weekday":"tuesday"');
+  expect(String(onboardingCall?.[1]?.body)).toContain('"weekday":"thursday"');
+  expect(String(onboardingCall?.[1]?.body)).toContain('"duration_min":60');
+  expect(useAuthStore.getState().onboardingDone).toBe(true);
 });

@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { t } from '../frontend/src/shared/i18n';
 import { devSeedPassword, login, logout, registerUser, saveDefaultOnboarding, verifyEmail } from './helpers';
 
 test('admin can assign trainer and trainer can review user and create support notifications', async ({ page }) => {
@@ -13,38 +14,40 @@ test('admin can assign trainer and trainer can review user and create support no
   await login(page, 'admin@local.test', devSeedPassword);
 
   await page.goto('/admin');
-  await page.getByLabel('Email пользователя').fill(email);
-  await page.getByLabel('Email тренера').fill('trainer@local.test');
-  await page.getByRole('button', { name: 'Назначить тренера' }).click();
+  await page.waitForLoadState('networkidle');
+  await page.getByLabel(t('ru', 'admin.userEmail')).selectOption(email);
+  await page.getByLabel(t('ru', 'admin.trainerEmail')).selectOption('trainer@local.test');
+  await page.getByRole('button', { name: t('ru', 'admin.assignTrainer') }).click();
 
   const equipmentName = `Тестовое оборудование ${Date.now()}`;
-  await page.getByLabel('Добавить оборудование').fill(equipmentName);
-  await page.getByRole('button', { name: 'Добавить оборудование' }).click();
+  await page.getByLabel(t('ru', 'admin.addEquipment')).fill(equipmentName);
+  await page.getByRole('button', { name: t('ru', 'admin.addEquipment') }).click();
   await expect(page.getByText(equipmentName)).toBeVisible();
 
   const exerciseName = `Тестовое упражнение ${Date.now()}`;
-  await page.getByLabel('Добавить упражнение').fill(exerciseName);
-  await page.getByRole('button', { name: 'Добавить упражнение' }).click();
+  await page.getByLabel(t('ru', 'admin.addExercise')).fill(exerciseName);
+  await page.getByRole('button', { name: t('ru', 'admin.addExercise') }).click();
   await expect(page.getByText(exerciseName)).toBeVisible();
 
   await logout(page);
   await login(page, email, password);
 
   await page.goto('/support');
-  await page.getByLabel('Тема').first().fill('Нужна помощь');
-  await page.getByLabel('Сообщение').first().fill('Болит колено после тренировки');
+  await page.getByLabel(t('ru', 'support.threadTitle')).fill('Нужна помощь');
+  await page.getByLabel(t('ru', 'support.threadBody')).fill('Болит колено после тренировки');
   await Promise.all([
     page.waitForResponse((response) => response.url().endsWith('/api/v1/support/threads') && response.ok()),
-    page.getByRole('button', { name: 'Создать тикет' }).click()
+    page.getByRole('button', { name: t('ru', 'support.threadCreate') }).click()
   ]);
   await expect(page.getByText('Нужна помощь')).toBeVisible();
 
-  await page.getByLabel('Тема').nth(1).fill('Завтраки');
-  await page.getByLabel('Категория').fill('nutrition');
-  await page.getByLabel('Сообщение').nth(1).fill('Какие быстрые завтраки подойдут?');
+  await page.getByRole('button', { name: t('ru', 'support.feed.communityTab') }).click();
+  await page.getByLabel(t('ru', 'support.threadTitle')).fill('Завтраки');
+  await page.getByLabel(t('ru', 'support.category')).selectOption('nutrition');
+  await page.getByLabel(t('ru', 'support.threadBody')).fill('Какие быстрые завтраки подойдут?');
   await Promise.all([
     page.waitForResponse((response) => response.url().endsWith('/api/v1/discussions/threads') && response.ok()),
-    page.getByRole('button', { name: 'Создать обсуждение' }).click()
+    page.getByRole('button', { name: t('ru', 'support.discussionCreate') }).click()
   ]);
   await expect(page.getByText('Завтраки')).toBeVisible();
 
@@ -53,24 +56,25 @@ test('admin can assign trainer and trainer can review user and create support no
 
   await page.goto('/trainer');
   await expect(page.getByText(email)).toBeVisible();
-  await page.getByRole('button', { name: 'Подробнее' }).click();
-  await expect(page.getByRole('heading', { name: 'Пользователь' })).toBeVisible();
+  await page.getByRole('button', { name: t('ru', 'trainer.details') }).click();
+  await expect(page.getByRole('heading', { name: t('ru', 'trainer.selectedUser') })).toBeVisible();
 
   await page.goto('/support');
   const supportThread = page.locator('article').filter({ hasText: 'Нужна помощь' }).first();
   await expect(supportThread).toBeVisible();
-  await supportThread.getByPlaceholder('Ответ').fill('Снизьте нагрузку на этой неделе');
+  await supportThread.getByLabel(t('ru', 'support.replyPlaceholder')).fill('Снизьте нагрузку на этой неделе');
   await Promise.all([
     page.waitForResponse((response) => response.url().includes('/api/v1/support/threads/') && response.url().endsWith('/messages') && response.ok()),
-    supportThread.getByRole('button', { name: 'Ответить' }).click()
+    supportThread.getByRole('button', { name: t('ru', 'support.replyAction') }).click()
   ]);
 
+  await page.getByRole('button', { name: t('ru', 'support.feed.communityTab') }).click();
   const discussionThread = page.locator('article').filter({ hasText: 'Завтраки' }).first();
   await expect(discussionThread).toBeVisible();
-  await discussionThread.getByPlaceholder('Ответ').fill('Попробуйте овсянку и яйца');
+  await discussionThread.getByLabel(t('ru', 'support.replyPlaceholder')).fill('Попробуйте овсянку и яйца');
   await Promise.all([
     page.waitForResponse((response) => response.url().includes('/api/v1/discussions/threads/') && response.url().endsWith('/replies') && response.ok()),
-    discussionThread.getByRole('button', { name: 'Ответить' }).click()
+    discussionThread.getByRole('button', { name: t('ru', 'support.replyAction') }).click()
   ]);
 
   await logout(page);

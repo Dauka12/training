@@ -47,6 +47,7 @@ func main() {
 	if cfg.CORSAllowedOrigins != "" {
 		options = append(options, app.WithAllowedOrigins(splitCSV(cfg.CORSAllowedOrigins)...))
 	}
+	options = append(options, app.WithFrontendURL(cfg.FrontendURL))
 	if cfg.AIAPIKey != "" && cfg.AIAPIBaseURL != "" && cfg.AIModel != "" {
 		options = append(options, app.WithAIProvider(app.OpenAICompatibleProvider{
 			BaseURL: cfg.AIAPIBaseURL,
@@ -54,6 +55,9 @@ func main() {
 			Model:   cfg.AIModel,
 			Logger:  logger,
 		}))
+	}
+	if provider := app.NewGoogleOAuthProvider(cfg.GoogleClientID, cfg.GoogleClientSecret, cfg.GoogleRedirectURL); provider != nil {
+		options = append(options, app.WithGoogleAuthProvider(provider))
 	}
 	application := app.New(logger, options...)
 	server := &http.Server{

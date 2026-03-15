@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { useStore } from 'zustand';
+import { Languages, MoonStar, PlaySquare, Search, SunMedium } from 'lucide-react';
 import { BrowserAppRouter } from './router';
 import { apiRequest } from '../shared/api/client';
 import { useAuthStore } from '../shared/auth/store';
@@ -71,14 +72,27 @@ export function App() {
     <div data-theme={theme} className="app-shell">
       <header className="topbar">
         <div className="topbar__brand">
-          <strong>{t(locale, 'brand.name')}</strong>
-          <span className="muted">{t(locale, 'shell.workspace')}</span>
+          <div className="topbar__brand-mark" aria-hidden="true">
+            <PlaySquare size={18} />
+          </div>
+          <div>
+            <strong>{t(locale, 'brand.name')}</strong>
+            <span className="muted">{t(locale, 'shell.workspace')}</span>
+          </div>
+        </div>
+        <div className="topbar__center">
+          <div className="topbar__search" aria-hidden="true">
+            <Search size={16} />
+            <span className="muted">{t(locale, 'shell.searchPlaceholder')}</span>
+          </div>
         </div>
         <div className="topbar__actions">
           <button type="button" className="button" onClick={handleLocaleToggle}>
+            <Languages size={18} aria-hidden="true" />
             {locale.toUpperCase()}
           </button>
           <button type="button" className="button" onClick={handleThemeToggle}>
+            {theme === 'light' ? <SunMedium size={18} aria-hidden="true" /> : <MoonStar size={18} aria-hidden="true" />}
             {t(locale, `theme.${theme}`)}
           </button>
         </div>

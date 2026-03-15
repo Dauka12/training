@@ -324,6 +324,25 @@ func (a *App) handleAssignTrainer(w http.ResponseWriter, r *http.Request, acting
 	writeJSON(w, http.StatusOK, map[string]string{"status": "assigned"})
 }
 
+func (a *App) handleEquipmentCatalog(w http.ResponseWriter, r *http.Request, _ *User) {
+	if r.Method != http.MethodGet {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+	a.mu.Lock()
+	defer a.mu.Unlock()
+
+	items := make([]EquipmentItem, 0, len(a.equipmentCatalog))
+	for _, item := range a.equipmentCatalog {
+		if !item.Active {
+			continue
+		}
+		items = append(items, item)
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{"items": items})
+}
+
 func (a *App) handleAdminEquipment(w http.ResponseWriter, r *http.Request, user *User) {
 	switch r.Method {
 	case http.MethodGet:

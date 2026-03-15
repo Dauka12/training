@@ -6,6 +6,7 @@ Privacy-first, mobile-first fitness planning web application with a Go backend, 
 
 - Public landing page with clear free-core-features message
 - Email/password auth
+- Google sign-in for login/registration with OAuth redirect flow
 - Email verification
 - Forgot/reset password
 - Local-development verification/reset token exposure in `development` mode only
@@ -96,6 +97,9 @@ Important variables:
 - `AI_API_BASE_URL`
 - `AI_API_KEY`
 - `AI_MODEL`
+- `GOOGLE_CLIENT_ID`
+- `GOOGLE_CLIENT_SECRET`
+- `GOOGLE_REDIRECT_URL`
 - `ENABLE_NOTIFICATION_EMAILS`
 - `HYDRATION_REMINDER_*`
 

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useMutation } from '@tanstack/react-query';
 import {
@@ -40,15 +40,23 @@ export function LoginPage({ locale, isAuthenticated }: { locale: SupportedLocale
   }
 
   return (
-    <main className="layout">
-      <section className="card">
-        <LoginForm locale={locale} onSubmit={mutation.mutateAsync} pending={mutation.isPending} message={message} />
-        <div className="link-stack">
+    <AuthScaffold
+      locale={locale}
+      footer={
+        <>
           <Link to="/register">{t(locale, 'auth.links.register')}</Link>
           <Link to="/forgot-password">{t(locale, 'auth.links.forgot')}</Link>
-        </div>
-      </section>
-    </main>
+        </>
+      }
+    >
+      <LoginForm
+        locale={locale}
+        onSubmit={mutation.mutateAsync}
+        pending={mutation.isPending}
+        message={message}
+        lead={t(locale, 'auth.login.lead')}
+      />
+    </AuthScaffold>
   );
 }
 
@@ -69,16 +77,24 @@ export function RegisterPage({ locale }: { locale: SupportedLocale }) {
   });
 
   return (
-    <main className="layout">
-      <section className="card">
-        <RegisterForm locale={locale} onSubmit={mutation.mutateAsync} pending={mutation.isPending} message={message} />
-        {devToken ? <p className="form-message">{t(locale, 'auth.devToken')}: {devToken}</p> : null}
-        <div className="link-stack">
+    <AuthScaffold
+      locale={locale}
+      devToken={devToken}
+      footer={
+        <>
           <Link to="/verify-email">{t(locale, 'auth.links.verify')}</Link>
           <Link to="/login">{t(locale, 'auth.links.login')}</Link>
-        </div>
-      </section>
-    </main>
+        </>
+      }
+    >
+      <RegisterForm
+        locale={locale}
+        onSubmit={mutation.mutateAsync}
+        pending={mutation.isPending}
+        message={message}
+        lead={t(locale, 'auth.register.lead')}
+      />
+    </AuthScaffold>
   );
 }
 
@@ -95,12 +111,15 @@ export function VerifyPage({ locale }: { locale: SupportedLocale }) {
   });
 
   return (
-    <main className="layout">
-      <section className="card">
-        <VerifyForm locale={locale} onSubmit={mutation.mutateAsync} pending={mutation.isPending} message={message} />
-        <Link to="/login">{t(locale, 'auth.links.login')}</Link>
-      </section>
-    </main>
+    <AuthScaffold locale={locale} footer={<Link to="/login">{t(locale, 'auth.links.login')}</Link>}>
+      <VerifyForm
+        locale={locale}
+        onSubmit={mutation.mutateAsync}
+        pending={mutation.isPending}
+        message={message}
+        lead={t(locale, 'auth.verify.lead')}
+      />
+    </AuthScaffold>
   );
 }
 
@@ -121,13 +140,19 @@ export function ForgotPasswordPage({ locale }: { locale: SupportedLocale }) {
   });
 
   return (
-    <main className="layout">
-      <section className="card">
-        <ForgotPasswordForm locale={locale} onSubmit={mutation.mutateAsync} pending={mutation.isPending} message={message} />
-        {devToken ? <p className="form-message">{t(locale, 'auth.devToken')}: {devToken}</p> : null}
-        <Link to="/reset-password">{t(locale, 'auth.reset.title')}</Link>
-      </section>
-    </main>
+    <AuthScaffold
+      locale={locale}
+      devToken={devToken}
+      footer={<Link to="/reset-password">{t(locale, 'auth.reset.title')}</Link>}
+    >
+      <ForgotPasswordForm
+        locale={locale}
+        onSubmit={mutation.mutateAsync}
+        pending={mutation.isPending}
+        message={message}
+        lead={t(locale, 'auth.forgot.lead')}
+      />
+    </AuthScaffold>
   );
 }
 
@@ -144,10 +169,76 @@ export function ResetPasswordPage({ locale }: { locale: SupportedLocale }) {
   });
 
   return (
-    <main className="layout">
-      <section className="card">
-        <ResetPasswordForm locale={locale} onSubmit={mutation.mutateAsync} pending={mutation.isPending} message={message} />
-        <Link to="/login">{t(locale, 'auth.links.login')}</Link>
+    <AuthScaffold locale={locale} footer={<Link to="/login">{t(locale, 'auth.links.login')}</Link>}>
+      <ResetPasswordForm
+        locale={locale}
+        onSubmit={mutation.mutateAsync}
+        pending={mutation.isPending}
+        message={message}
+        lead={t(locale, 'auth.reset.lead')}
+      />
+    </AuthScaffold>
+  );
+}
+
+function AuthScaffold({
+  locale,
+  children,
+  footer,
+  devToken
+}: {
+  locale: SupportedLocale;
+  children: ReactNode;
+  footer: ReactNode;
+  devToken?: string;
+}) {
+  const hydrationPreview = `2600 ${t(locale, 'common.unitMl')}`;
+
+  return (
+    <main className="auth-layout">
+      <section className="card auth-panel auth-panel--brand">
+        <div className="auth-panel__brand">
+          <span className="badge">{t(locale, 'landing.free')}</span>
+          <strong>{t(locale, 'brand.name')}</strong>
+        </div>
+        <div className="stack">
+          <h2>{t(locale, 'landing.dashboard.title')}</h2>
+          <p className="muted">{t(locale, 'landing.dashboard.body')}</p>
+        </div>
+        <div className="auth-metric-grid">
+          <article className="stat stat--compact">
+            <span className="muted">{t(locale, 'landing.preview.health')}</span>
+            <strong>{t(locale, 'status.healthy')}</strong>
+          </article>
+          <article className="stat stat--compact">
+            <span className="muted">{t(locale, 'landing.preview.hydration')}</span>
+            <strong>{hydrationPreview}</strong>
+          </article>
+          <article className="stat stat--compact">
+            <span className="muted">{t(locale, 'landing.preview.notifications')}</span>
+            <strong>3</strong>
+          </article>
+        </div>
+        <div className="stack auth-points">
+          <article className="notice">
+            <strong>{t(locale, 'landing.benefit.plan')}</strong>
+            <span className="muted">{t(locale, 'landing.how.two')}</span>
+          </article>
+          <article className="notice">
+            <strong>{t(locale, 'landing.benefit.track')}</strong>
+            <span className="muted">{t(locale, 'landing.how.three')}</span>
+          </article>
+          <article className="notice">
+            <strong>{t(locale, 'landing.benefit.support')}</strong>
+            <span className="muted">{t(locale, 'landing.free.body')}</span>
+          </article>
+        </div>
+      </section>
+
+      <section className="card auth-panel auth-panel--form">
+        <div className="auth-panel__form">{children}</div>
+        {devToken ? <p className="form-message">{t(locale, 'auth.devToken')}: {devToken}</p> : null}
+        <div className="auth-link-grid">{footer}</div>
       </section>
     </main>
   );

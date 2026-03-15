@@ -300,6 +300,35 @@ func TestRoleAccessAndSupportDiscussionNotifications(t *testing.T) {
 	_ = adminEmail
 }
 
+func TestAuthenticatedUserCanReadEquipmentCatalog(t *testing.T) {
+	_, server, client, _ := createVerifiedSession(t)
+	defer server.Close()
+
+	resp := doJSON(t, client, http.MethodGet, server.URL+"/api/v1/catalog/equipment", nil, "")
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected catalog ok, got %d", resp.StatusCode)
+	}
+
+	var payload struct {
+		Items []struct {
+			ID    string            `json:"id"`
+			Names map[string]string `json:"names"`
+		} `json:"items"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
+		t.Fatal(err)
+	}
+	if len(payload.Items) == 0 {
+		t.Fatal("expected seeded equipment items")
+	}
+	if payload.Items[0].ID == "" {
+		t.Fatal("expected equipment id")
+	}
+	if payload.Items[0].Names["ru"] == "" {
+		t.Fatal("expected localized equipment name")
+	}
+}
+
 func TestOnboardingPersistsExtendedPlanningPreferencesAndReturnsProfile(t *testing.T) {
 	_, server, client, _ := createVerifiedSession(t)
 	defer server.Close()

@@ -1,3 +1,5 @@
+import type { HTMLInputTypeAttribute } from 'react';
+import { ChevronDown } from 'lucide-react';
 import { t, type SupportedLocale } from '../i18n';
 
 export function SectionPage({ title }: { title: string }) {
@@ -20,16 +22,41 @@ export function CardStat({ title, value }: { title: string; value: string }) {
 export function Field({
   label,
   value,
-  onChange
+  onChange,
+  type = 'text',
+  placeholder,
+  inputMode,
+  min,
+  max,
+  step,
+  autoComplete
 }: {
   label: string;
   value: string;
   onChange: (value: string) => void;
+  type?: HTMLInputTypeAttribute;
+  placeholder?: string;
+  inputMode?: 'none' | 'text' | 'tel' | 'url' | 'email' | 'numeric' | 'decimal' | 'search';
+  min?: number | string;
+  max?: number | string;
+  step?: number | string;
+  autoComplete?: string;
 }) {
   return (
     <label className="field">
       <span>{label}</span>
-      <input value={value} onChange={(event) => onChange(event.target.value)} />
+      <input
+        aria-label={label}
+        type={type}
+        value={value}
+        placeholder={placeholder}
+        inputMode={inputMode}
+        min={min}
+        max={max}
+        step={step}
+        autoComplete={autoComplete}
+        onChange={(event) => onChange(event.target.value)}
+      />
     </label>
   );
 }
@@ -38,23 +65,28 @@ export function SelectField({
   label,
   value,
   onChange,
-  options
+  options,
+  disabled = false
 }: {
   label: string;
   value: string;
   onChange: (value: string) => void;
   options: Array<{ value: string; label: string }>;
+  disabled?: boolean;
 }) {
   return (
     <label className="field">
       <span>{label}</span>
-      <select aria-label={label} value={value} onChange={(event) => onChange(event.target.value)}>
-        {options.map((option) => (
-          <option key={option.value} value={option.value}>
-            {option.label}
-          </option>
-        ))}
-      </select>
+      <div className="select-shell">
+        <select aria-label={label} value={value} onChange={(event) => onChange(event.target.value)} disabled={disabled}>
+          {options.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+        <ChevronDown aria-hidden="true" className="select-shell__icon" size={18} />
+      </div>
     </label>
   );
 }
@@ -105,13 +137,16 @@ export function StatusSelect({
   options: Array<{ value: string; label: string }>;
 }) {
   return (
-    <select value={value} onChange={(event) => onChange(event.target.value)}>
-      {options.map((option) => (
-        <option key={option.value} value={option.value}>
-          {option.label}
-        </option>
-      ))}
-    </select>
+    <div className="select-shell">
+      <select value={value} onChange={(event) => onChange(event.target.value)}>
+        {options.map((option) => (
+          <option key={option.value} value={option.value}>
+            {option.label}
+          </option>
+        ))}
+      </select>
+      <ChevronDown aria-hidden="true" className="select-shell__icon" size={18} />
+    </div>
   );
 }
 

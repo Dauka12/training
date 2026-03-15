@@ -18,6 +18,10 @@ type Config struct {
 	SessionSecret          string
 	CORSAllowedOrigins     string
 	EnableNotificationMail bool
+	FrontendURL            string
+	GoogleClientID         string
+	GoogleClientSecret     string
+	GoogleRedirectURL      string
 }
 
 func Load() Config {
@@ -35,6 +39,10 @@ func Load() Config {
 		SessionSecret:          getEnv("SESSION_SECRET", ""),
 		CORSAllowedOrigins:     getEnv("CORS_ALLOWED_ORIGINS", "http://localhost:5173"),
 		EnableNotificationMail: strings.EqualFold(getEnv("ENABLE_NOTIFICATION_EMAILS", "false"), "true"),
+		FrontendURL:            getEnv("FRONTEND_URL", "http://localhost:5173"),
+		GoogleClientID:         getEnv("GOOGLE_CLIENT_ID", ""),
+		GoogleClientSecret:     getEnv("GOOGLE_CLIENT_SECRET", ""),
+		GoogleRedirectURL:      getEnv("GOOGLE_REDIRECT_URL", ""),
 	}
 }
 

@@ -2,6 +2,7 @@ import type { ReactElement } from 'react';
 import { useMemo } from 'react';
 import { BrowserRouter, Link, MemoryRouter, NavLink, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { Activity, BadgeHelp, ChartNoAxesCombined, CircleUserRound, ClipboardList, House, LayoutDashboard, ShieldCheck, Users } from 'lucide-react';
 import {
   ForgotPasswordPage,
   LoginPage,
@@ -19,6 +20,7 @@ import { t, type SupportedLocale } from '../shared/i18n';
 import { SectionPage } from '../shared/ui/forms';
 
 type AuthSnapshot = Pick<AuthState, 'isAuthenticated' | 'role'> & { email?: string; onboardingDone?: boolean };
+type NavItem = { to: string; label: string; icon: ReactElement };
 
 export function AppRouter({
   initialEntries,
@@ -117,10 +119,17 @@ function Shell({ locale, auth, children }: { locale: SupportedLocale; auth: Auth
   const navigate = useNavigate();
   const location = useLocation();
   const navItems = navigationItems(locale, auth.role);
+  const onboardingLocked = auth.role === 'user' && auth.onboardingDone === false;
+  const onboardingBlockedPaths = new Set(['/today', '/plan', '/track', '/progress']);
   const currentPage = navItems.find((item) => item.to === location.pathname) ?? {
     label: t(locale, 'shell.workspace'),
-    to: location.pathname
+    to: location.pathname,
+    icon: <LayoutDashboard size={18} />
   };
+  const dockItems = mobileDockItems(navItems, currentPage);
+  const quickItems = navItems.filter((item) =>
+    ['/today', '/plan', '/track', '/progress', '/support'].includes(item.to)
+  );
 
   async function handleLogout() {
     await apiRequest('/auth/logout', { method: 'POST' }).catch(() => undefined);
@@ -128,35 +137,72 @@ function Shell({ locale, auth, children }: { locale: SupportedLocale; auth: Auth
     navigate('/login');
   }
 
+  function openOnboarding() {
+    if (location.pathname !== '/profile') {
+      navigate('/profile');
+      setTimeout(() => {
+        document.getElementById('onboarding-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 0);
+      return;
+    }
+
+    document.getElementById('onboarding-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
   return (
-    <main className="workspace">
-      <aside className="workspace__sidebar">
-        <section className="card shell-card shell-card--brand">
+    <main className="workspace-shell" data-testid="workspace-shell">
+      <aside className="workspace-shell__sidebar" data-testid="workspace-sidebar">
+        <section className="card shell-card shell-card--brand rail-brand workspace-rail__brand">
           <div className="shell-brand">
-            <strong>{t(locale, 'brand.name')}</strong>
-            <span className="badge">{t(locale, 'shell.workspace')}</span>
+            <span className="shell-brand__mark" aria-hidden="true">
+              <LayoutDashboard size={18} />
+            </span>
+            <div>
+              <strong>{t(locale, 'brand.name')}</strong>
+              <p className="muted">{t(locale, 'shell.workspace')}</p>
+            </div>
           </div>
           <p className="muted">{t(locale, 'shell.subtitle')}</p>
-          <div className="shell-highlights">
-            <span className="badge badge--soft">{t(locale, 'nav.today')}</span>
-            <span className="badge badge--soft">{t(locale, 'nav.plan')}</span>
-            <span className="badge badge--soft">{t(locale, 'nav.track')}</span>
-          </div>
         </section>
 
-        <nav className="card shell-card shell-nav" aria-label={t(locale, 'shell.navigation')}>
-          {navItems.map((item) => (
-            <NavLink
-              key={item.to}
-              to={item.to}
-              className={({ isActive }) => `nav-link${isActive ? ' nav-link--active' : ''}`}
-            >
-              <span>{item.label}</span>
-            </NavLink>
-          ))}
+        <nav className="card shell-card shell-nav workspace-rail__nav" aria-label={t(locale, 'shell.navigation')}>
+          {navItems.map((item) => {
+            const locked = onboardingLocked && onboardingBlockedPaths.has(item.to);
+
+            if (locked) {
+              return (
+                <button
+                  key={item.to}
+                  type="button"
+                  className="nav-link nav-link--rail nav-link--button"
+                  onClick={openOnboarding}
+                >
+                  <span className="nav-link__icon" aria-hidden="true">{item.icon}</span>
+                  <span className="nav-link__content">
+                    <span className="nav-link__label">{item.label}</span>
+                    <span className="nav-link__meta">{t(locale, 'profile.onboarding')}</span>
+                  </span>
+                </button>
+              );
+            }
+
+            return (
+              <NavLink
+                key={item.to}
+                to={item.to}
+                className={({ isActive }) => `nav-link nav-link--rail${isActive ? ' nav-link--active' : ''}`}
+              >
+                <span className="nav-link__icon" aria-hidden="true">{item.icon}</span>
+                <span className="nav-link__content">
+                  <span className="nav-link__label">{item.label}</span>
+                  <span className="nav-link__meta">{item.to === currentPage.to ? roleLabel(locale, auth.role) : t(locale, 'shell.workspace')}</span>
+                </span>
+              </NavLink>
+            );
+          })}
         </nav>
 
-        <section className="card shell-card shell-account">
+        <section className="card shell-card shell-account rail-account workspace-rail__account">
           <span className="muted shell-account__label">{t(locale, 'shell.account')}</span>
           <strong>{auth.email || t(locale, 'brand.name')}</strong>
           <span className="muted">{roleLabel(locale, auth.role)}</span>
@@ -166,19 +212,81 @@ function Shell({ locale, auth, children }: { locale: SupportedLocale; auth: Auth
         </section>
       </aside>
 
-      <section className="workspace__main">
-        <header className="card workspace-header">
-          <div className="workspace-header__copy">
+      <section className="workspace-shell__main">
+        <header className="card workspace-shell__header" data-testid="workspace-header">
+          <div className="workspace-shell__headline">
             <p className="eyebrow">{t(locale, 'shell.workspace')}</p>
-            <p className="workspace-header__title">{currentPage.label}</p>
+            <p className="workspace-shell__title">{currentPage.label}</p>
             <p className="muted">{t(locale, 'shell.subtitle')}</p>
           </div>
-          <div className="workspace-header__meta">
-            <span className="badge badge--soft">{roleLabel(locale, auth.role)}</span>
-            <span className="muted">{t(locale, 'brand.name')}</span>
+          <div className="workspace-shell__toolbar">
+            <div className="workspace-shell__meta">
+              <span className="badge badge--soft">{roleLabel(locale, auth.role)}</span>
+              <span className="badge">{auth.email || t(locale, 'brand.name')}</span>
+            </div>
+            <nav className="workspace-shell__chips" aria-label={t(locale, 'shell.quickNavigation')}>
+              {quickItems.map((item) => {
+                const locked = onboardingLocked && onboardingBlockedPaths.has(item.to);
+
+                if (locked) {
+                  return (
+                    <button
+                      key={item.to}
+                      type="button"
+                      className="workspace-chip"
+                      onClick={openOnboarding}
+                    >
+                      <span className="workspace-chip__icon" aria-hidden="true">{item.icon}</span>
+                      <span>{item.label}</span>
+                    </button>
+                  );
+                }
+
+                return (
+                  <NavLink
+                    key={item.to}
+                    to={item.to}
+                    className={({ isActive }) => `workspace-chip${isActive ? ' workspace-chip--active' : ''}`}
+                  >
+                    <span className="workspace-chip__icon" aria-hidden="true">{item.icon}</span>
+                    <span>{item.label}</span>
+                  </NavLink>
+                );
+              })}
+            </nav>
           </div>
         </header>
-        <div className="workspace__content">{children}</div>
+        <div className="workspace-shell__content">{children}</div>
+        <nav className="mobile-dock" aria-label={`${t(locale, 'shell.quickNavigation')} mobile`}>
+          {dockItems.map((item) => {
+            const locked = onboardingLocked && onboardingBlockedPaths.has(item.to);
+
+            if (locked) {
+              return (
+                <button
+                  key={item.to}
+                  type="button"
+                  className="mobile-dock__link"
+                  onClick={openOnboarding}
+                >
+                  <span className="mobile-dock__icon" aria-hidden="true">{item.icon}</span>
+                  <span>{item.label}</span>
+                </button>
+              );
+            }
+
+            return (
+              <NavLink
+                key={item.to}
+                to={item.to}
+                className={({ isActive }) => `mobile-dock__link${isActive ? ' mobile-dock__link--active' : ''}`}
+              >
+                <span className="mobile-dock__icon" aria-hidden="true">{item.icon}</span>
+                <span>{item.label}</span>
+              </NavLink>
+            );
+          })}
+        </nav>
       </section>
     </main>
   );
@@ -284,19 +392,35 @@ function LandingPage({ locale }: { locale: SupportedLocale }) {
   );
 }
 
-function navigationItems(locale: SupportedLocale, role: AuthRole) {
+function navigationItems(locale: SupportedLocale, role: AuthRole): NavItem[] {
   return [
-    { to: '/today', label: t(locale, 'nav.today') },
-    { to: '/plan', label: t(locale, 'nav.plan') },
-    { to: '/track', label: t(locale, 'nav.track') },
-    { to: '/progress', label: t(locale, 'nav.progress') },
-    { to: '/profile', label: t(locale, 'nav.profile') },
-    { to: '/support', label: t(locale, 'nav.support') },
-    ...(role === 'trainer' || role === 'admin' ? [{ to: '/trainer', label: t(locale, 'nav.trainer') }] : []),
-    ...(role === 'admin' ? [{ to: '/admin', label: t(locale, 'nav.admin') }] : [])
+    { to: '/today', label: t(locale, 'nav.today'), icon: <House size={18} /> },
+    { to: '/plan', label: t(locale, 'nav.plan'), icon: <ClipboardList size={18} /> },
+    { to: '/track', label: t(locale, 'nav.track'), icon: <Activity size={18} /> },
+    { to: '/progress', label: t(locale, 'nav.progress'), icon: <ChartNoAxesCombined size={18} /> },
+    { to: '/profile', label: t(locale, 'nav.profile'), icon: <CircleUserRound size={18} /> },
+    { to: '/support', label: t(locale, 'nav.support'), icon: <BadgeHelp size={18} /> },
+    ...(role === 'trainer' || role === 'admin' ? [{ to: '/trainer', label: t(locale, 'nav.trainer'), icon: <Users size={18} /> }] : []),
+    ...(role === 'admin' ? [{ to: '/admin', label: t(locale, 'nav.admin'), icon: <ShieldCheck size={18} /> }] : [])
   ];
 }
 
 function roleLabel(locale: SupportedLocale, role: AuthRole) {
   return t(locale, `shell.role.${role}`);
+}
+
+function mobileDockItems(
+  items: NavItem[],
+  currentItem: NavItem
+): NavItem[] {
+  const preferredOrder = ['/today', '/plan', '/track', '/progress'];
+  const base = preferredOrder
+    .map((path) => items.find((item) => item.to === path))
+    .filter((item): item is NavItem => Boolean(item));
+
+  if (base.some((item) => item.to === currentItem.to)) {
+    return [...base, items.find((item) => item.to === '/profile') ?? currentItem].slice(0, 5);
+  }
+
+  return [...base, currentItem].slice(0, 5);
 }

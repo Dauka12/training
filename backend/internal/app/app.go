@@ -27,6 +27,8 @@ type App struct {
 	emailSender       emailintegration.Sender
 	clock             Clock
 	auditLogs         []AuditLog
+	frontendURL       string
+	googleAuth        GoogleAuthProvider
 }
 
 type Option func(*App)
@@ -71,6 +73,20 @@ func WithClock(clock Clock) Option {
 	}
 }
 
+func WithFrontendURL(frontendURL string) Option {
+	return func(app *App) {
+		if frontendURL != "" {
+			app.frontendURL = frontendURL
+		}
+	}
+}
+
+func WithGoogleAuthProvider(provider GoogleAuthProvider) Option {
+	return func(app *App) {
+		app.googleAuth = provider
+	}
+}
+
 func New(logger *slog.Logger, options ...Option) *App {
 	app := &App{
 		log:               logger,
@@ -85,6 +101,7 @@ func New(logger *slog.Logger, options ...Option) *App {
 		authLimiter:       NewAuthRateLimiter(),
 		allowedOrigins:    []string{"http://localhost:5173"},
 		clock:             RealClock{},
+		frontendURL:       "http://localhost:5173",
 	}
 	for _, option := range options {
 		option(app)
@@ -104,7 +121,11 @@ func (a *App) Routes() http.Handler {
 	mux.HandleFunc("/api/v1/auth/logout", a.withAuth(a.handleLogout))
 	mux.HandleFunc("/api/v1/auth/forgot-password", a.handleForgotPassword)
 	mux.HandleFunc("/api/v1/auth/reset-password", a.handleResetPassword)
+	mux.HandleFunc("/api/v1/auth/google/start", a.handleGoogleStart)
+	mux.HandleFunc("/api/v1/auth/google/callback", a.handleGoogleCallback)
+	mux.HandleFunc("/api/v1/auth/google/dev-callback", a.handleGoogleDevCallback)
 	mux.HandleFunc("/api/v1/me", a.withAuth(a.handleMe))
+	mux.HandleFunc("/api/v1/catalog/equipment", a.withAuth(a.handleEquipmentCatalog))
 	mux.HandleFunc("/api/v1/me/preferences", a.withAuth(a.handlePreferences))
 	mux.HandleFunc("/api/v1/onboarding", a.withAuth(a.handleOnboarding))
 	mux.HandleFunc("/api/v1/plans/generate", a.withAuth(a.handleGeneratePlan))

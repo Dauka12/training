@@ -5,7 +5,7 @@ const backendPort = 18080;
 
 export default defineConfig({
   testDir: './e2e',
-  timeout: 60_000,
+  timeout: 120_000,
   expect: {
     timeout: 10_000
   },

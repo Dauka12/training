@@ -4,6 +4,7 @@ type User struct {
 	ID                      string                  `json:"id"`
 	Email                   string                  `json:"email"`
 	PasswordHash            string                  `json:"password_hash"`
+	AuthProvider            string                  `json:"auth_provider,omitempty"`
 	Verified                bool                    `json:"verified"`
 	Locale                  string                  `json:"locale"`
 	Theme                   string                  `json:"theme"`
