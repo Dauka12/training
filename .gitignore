@@ -1,0 +1,13 @@
+node_modules/
+test-results/
+playwright-report/
+
+.cache/
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+frontend/.vite-temp/
+
+backend/.env
+frontend/.env
+.env
