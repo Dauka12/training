@@ -65,6 +65,17 @@ test('does not block admin route when onboarding is incomplete', () => {
   expect(screen.getByRole('heading', { name: t('ru', 'admin.title') })).toBeInTheDocument();
 });
 
+test('redirects authenticated user to forced password change screen when required', () => {
+  render(
+    <AppRouter
+      initialEntries={['/today']}
+      initialAuth={{ isAuthenticated: true, role: 'admin', onboardingDone: true, email: 'admin@example.com', mustChangePassword: true }}
+    />
+  );
+
+  expect(screen.getByRole('heading', { name: t('ru', 'auth.changePassword.title') })).toBeInTheDocument();
+});
+
 test('renders workspace shell with account summary for authenticated user', () => {
   render(
     <AppRouter

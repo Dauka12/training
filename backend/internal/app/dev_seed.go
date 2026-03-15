@@ -1,6 +1,7 @@
 package app
 
 const developmentSeedPassword = "DevPassw0rd!123"
+const bootstrapAdminPassword = "admin"
 
 func (a *App) seedDevelopmentUsers() {
 	if !isDevelopmentMode() {
@@ -11,6 +12,7 @@ func (a *App) seedDevelopmentUsers() {
 	defer a.mu.Unlock()
 
 	seeded := false
+	seeded = a.ensureDevelopmentUserLockedWithPassword("admin@example.com", []string{"admin"}, bootstrapAdminPassword, true) || seeded
 	seeded = a.ensureDevelopmentUserLocked("admin@local.test", []string{"admin"}) || seeded
 	seeded = a.ensureDevelopmentUserLocked("trainer@local.test", []string{"trainer"}) || seeded
 	seeded = a.ensureDevelopmentUserLocked("member@local.test", []string{"user"}) || seeded
@@ -20,11 +22,15 @@ func (a *App) seedDevelopmentUsers() {
 }
 
 func (a *App) ensureDevelopmentUserLocked(email string, roles []string) bool {
+	return a.ensureDevelopmentUserLockedWithPassword(email, roles, developmentSeedPassword, false)
+}
+
+func (a *App) ensureDevelopmentUserLockedWithPassword(email string, roles []string, password string, mustChangePassword bool) bool {
 	if _, exists := a.byMail[email]; exists {
 		return false
 	}
 
-	passwordHash, err := hashPassword(developmentSeedPassword)
+	passwordHash, err := hashPassword(password)
 	if err != nil {
 		a.log.Error("failed to hash development seed password", "email", email, "error", err)
 		return false
@@ -38,6 +44,7 @@ func (a *App) ensureDevelopmentUserLocked(email string, roles []string) bool {
 		Locale:       "ru",
 		Theme:        "light",
 		Roles:        append([]string(nil), roles...),
+		MustChangePassword: mustChangePassword,
 		NotificationPreferences: NotificationPreferences{
 			HydrationReminder: true,
 		},

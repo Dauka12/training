@@ -151,7 +151,11 @@ func (a *App) handleLogin(w http.ResponseWriter, r *http.Request) {
 		HttpOnly: false,
 		SameSite: http.SameSiteStrictMode,
 	})
-	writeJSON(w, http.StatusOK, map[string]string{"status": "ok", "csrf_token": rawCSRF})
+	writeJSON(w, http.StatusOK, map[string]any{
+		"status":               "ok",
+		"csrf_token":           rawCSRF,
+		"must_change_password": user.MustChangePassword,
+	})
 }
 
 func (a *App) handleLogout(w http.ResponseWriter, _ *http.Request, user *User) {
@@ -191,6 +195,39 @@ func (a *App) handleForgotPassword(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	writeJSON(w, http.StatusOK, response)
+}
+
+func (a *App) handleChangePassword(w http.ResponseWriter, r *http.Request, user *User) {
+	if r.Method != http.MethodPost {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+	var req struct {
+		CurrentPassword string `json:"current_password"`
+		NewPassword     string `json:"new_password"`
+	}
+	if !decodeJSON(w, r, &req) {
+		return
+	}
+	if len(req.NewPassword) < 10 {
+		writeError(w, http.StatusBadRequest, "validation_error", "Password too short")
+		return
+	}
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if !verifyPassword(user.PasswordHash, req.CurrentPassword) {
+		writeError(w, http.StatusUnauthorized, "invalid_credentials", "Invalid credentials")
+		return
+	}
+	passwordHash, err := hashPassword(req.NewPassword)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "internal_error", "Could not change password")
+		return
+	}
+	user.PasswordHash = passwordHash
+	user.MustChangePassword = false
+	a.persistStateLocked()
+	writeJSON(w, http.StatusOK, map[string]string{"status": "password_changed"})
 }
 
 func (a *App) handleResetPassword(w http.ResponseWriter, r *http.Request) {
@@ -253,6 +290,10 @@ func (a *App) withAuth(next func(http.ResponseWriter, *http.Request, *User)) htt
 			writeError(w, http.StatusUnauthorized, "unauthorized", "Unauthorized")
 			return
 		}
+		if matched.MustChangePassword && !isAllowedDuringForcedPasswordChange(r.URL.Path) {
+			writeError(w, http.StatusForbidden, "password_change_required", "Password change required")
+			return
+		}
 		if requiresCSRF(r.Method) {
 			csrfCookie, cookieErr := r.Cookie("csrf")
 			csrfHeader := r.Header.Get("X-CSRF-Token")
@@ -283,6 +324,7 @@ func (a *App) handleMe(w http.ResponseWriter, _ *http.Request, user *User) {
 		"theme":             user.Theme,
 		"roles":             user.Roles,
 		"verified":          user.Verified,
+		"must_change_password": user.MustChangePassword,
 		"onboarding_done":   user.OnboardingDone,
 		"profile":           user.Profile,
 		"water_target_ml":   user.WaterTargetML,
@@ -358,4 +400,13 @@ func requiresCSRF(method string) bool {
 
 func authKey(r *http.Request, action string) string {
 	return action + ":" + strings.Split(r.RemoteAddr, ":")[0]
+}
+
+func isAllowedDuringForcedPasswordChange(path string) bool {
+	switch path {
+	case "/api/v1/me", "/api/v1/auth/logout", "/api/v1/auth/change-password":
+		return true
+	default:
+		return false
+	}
 }

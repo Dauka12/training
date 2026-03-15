@@ -85,6 +85,127 @@ func TestRegisterVerifyLoginForgotResetFlow(t *testing.T) {
 	}
 }
 
+func TestDevelopmentBootstrapAdminRequiresPasswordChange(t *testing.T) {
+	t.Setenv("APP_ENV", "development")
+
+	app := New(slog.New(slog.NewTextHandler(io.Discard, nil)))
+	server := httptest.NewServer(app.Routes())
+	defer server.Close()
+
+	client := newClient(t)
+
+	loginResp := doJSON(t, client, http.MethodPost, server.URL+"/api/v1/auth/login", map[string]any{
+		"email":    "admin@example.com",
+		"password": "admin",
+	}, "")
+	if loginResp.StatusCode != http.StatusOK {
+		t.Fatalf("expected bootstrap admin login ok, got %d", loginResp.StatusCode)
+	}
+
+	var loginPayload struct {
+		MustChangePassword bool `json:"must_change_password"`
+	}
+	if err := json.NewDecoder(loginResp.Body).Decode(&loginPayload); err != nil {
+		t.Fatal(err)
+	}
+	if !loginPayload.MustChangePassword {
+		t.Fatal("expected bootstrap admin to require password change")
+	}
+
+	meResp := doJSON(t, client, http.MethodGet, server.URL+"/api/v1/me", nil, "")
+	if meResp.StatusCode != http.StatusOK {
+		t.Fatalf("expected me ok, got %d", meResp.StatusCode)
+	}
+	var mePayload struct {
+		MustChangePassword bool     `json:"must_change_password"`
+		Roles              []string `json:"roles"`
+	}
+	if err := json.NewDecoder(meResp.Body).Decode(&mePayload); err != nil {
+		t.Fatal(err)
+	}
+	if !mePayload.MustChangePassword {
+		t.Fatal("expected /me to expose must_change_password")
+	}
+	if len(mePayload.Roles) == 0 || mePayload.Roles[0] != "admin" {
+		t.Fatalf("expected bootstrap admin role, got %+v", mePayload.Roles)
+	}
+
+	adminResp := doJSON(t, client, http.MethodGet, server.URL+"/api/v1/admin/users", nil, "")
+	if adminResp.StatusCode != http.StatusForbidden {
+		t.Fatalf("expected admin area blocked until password change, got %d", adminResp.StatusCode)
+	}
+
+	csrf := cookieValue(t, client, server.URL, "csrf")
+	changeResp := doJSON(t, client, http.MethodPost, server.URL+"/api/v1/auth/change-password", map[string]any{
+		"current_password": "admin",
+		"new_password":     "AdminPassw0rd!2026",
+	}, csrf)
+	if changeResp.StatusCode != http.StatusOK {
+		t.Fatalf("expected password change ok, got %d", changeResp.StatusCode)
+	}
+
+	adminResp = doJSON(t, client, http.MethodGet, server.URL+"/api/v1/admin/users", nil, "")
+	if adminResp.StatusCode != http.StatusOK {
+		t.Fatalf("expected admin area after password change, got %d", adminResp.StatusCode)
+	}
+
+	doJSON(t, client, http.MethodPost, server.URL+"/api/v1/auth/logout", nil, csrf)
+
+	oldLoginResp := doJSON(t, client, http.MethodPost, server.URL+"/api/v1/auth/login", map[string]any{
+		"email":    "admin@example.com",
+		"password": "admin",
+	}, "")
+	if oldLoginResp.StatusCode != http.StatusUnauthorized {
+		t.Fatalf("expected bootstrap password invalid after change, got %d", oldLoginResp.StatusCode)
+	}
+
+	newLoginResp := doJSON(t, client, http.MethodPost, server.URL+"/api/v1/auth/login", map[string]any{
+		"email":    "admin@example.com",
+		"password": "AdminPassw0rd!2026",
+	}, "")
+	if newLoginResp.StatusCode != http.StatusOK {
+		t.Fatalf("expected login with changed password ok, got %d", newLoginResp.StatusCode)
+	}
+}
+
+func TestAuthenticatedUserCanReadExerciseDetail(t *testing.T) {
+	_, server, client, _ := createVerifiedSession(t)
+	defer server.Close()
+
+	resp := doJSON(t, client, http.MethodGet, server.URL+"/api/v1/catalog/exercises/20000000-0000-0000-0000-000000000001", nil, "")
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected exercise detail ok, got %d", resp.StatusCode)
+	}
+
+	var payload struct {
+		Exercise struct {
+			ID                   string   `json:"id"`
+			MediaURL             string   `json:"media_url"`
+			Technique            string   `json:"technique"`
+			ContraindicationTags []string `json:"contraindication_tags"`
+			Substitutions        []struct {
+				ID   string `json:"id"`
+				Name string `json:"name"`
+			} `json:"substitutions"`
+		} `json:"exercise"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
+		t.Fatal(err)
+	}
+	if payload.Exercise.ID == "" || payload.Exercise.MediaURL == "" {
+		t.Fatalf("expected media-rich exercise payload, got %+v", payload.Exercise)
+	}
+	if payload.Exercise.Technique == "" {
+		t.Fatalf("expected technique in exercise detail, got %+v", payload.Exercise)
+	}
+	if len(payload.Exercise.ContraindicationTags) == 0 {
+		t.Fatalf("expected contraindication tags, got %+v", payload.Exercise)
+	}
+	if len(payload.Exercise.Substitutions) == 0 {
+		t.Fatalf("expected substitutions, got %+v", payload.Exercise)
+	}
+}
+
 func TestPlanGenerationVersioningAndTracking(t *testing.T) {
 	app, server, client, email := createVerifiedSession(t)
 	defer server.Close()

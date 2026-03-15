@@ -15,6 +15,7 @@ type User struct {
 	ResetTokenHash          string                  `json:"reset_token_hash"`
 	VerifyToken             string                  `json:"-"`
 	ResetToken              string                  `json:"-"`
+	MustChangePassword      bool                    `json:"must_change_password"`
 	OnboardingDone          bool                    `json:"onboarding_done"`
 	Profile                 UserProfile             `json:"profile"`
 	WaterTargetML           int                     `json:"water_target_ml"`
@@ -265,6 +266,8 @@ type ExerciseItem struct {
 	LocationType string            `json:"location_type"`
 	EquipmentIDs []string          `json:"equipment_ids"`
 	MediaURL     string            `json:"media_url"`
+	ContraindicationTags []string  `json:"contraindication_tags"`
+	SubstitutionIDs      []string  `json:"substitution_ids"`
 	Active       bool              `json:"active"`
 }
 
