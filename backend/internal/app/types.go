@@ -35,25 +35,25 @@ type User struct {
 }
 
 type UserProfile struct {
-	Age                   int               `json:"age"`
-	BiologicalSex         string            `json:"biological_sex"`
-	HeightCM              int               `json:"height_cm"`
-	CurrentWeightKG       int               `json:"current_weight_kg"`
-	TargetWeightKG        int               `json:"target_weight_kg"`
-	PrimaryGoal           string            `json:"primary_goal"`
-	ProgramDurationWeeks  int               `json:"program_duration_weeks"`
-	ExperienceLevel       string            `json:"experience_level"`
-	ActivityLevel         string            `json:"activity_level"`
-	TrainingLocation      string            `json:"training_location"`
-	Timezone              string            `json:"timezone"`
-	PreferredTrainingStyle string           `json:"preferred_training_style"`
-	PreferredMealStyle     string           `json:"preferred_meal_style"`
-	HydrationPreference    string           `json:"hydration_preference"`
-	AvailableTrainingDays []AvailabilityDay `json:"available_training_days"`
-	EquipmentIDs          []string          `json:"equipment_ids"`
-	Injuries              []string          `json:"injuries"`
-	DietaryPreferences    []string          `json:"dietary_preferences"`
-	AvoidFoods            []string          `json:"avoid_foods"`
+	Age                    int               `json:"age"`
+	BiologicalSex          string            `json:"biological_sex"`
+	HeightCM               int               `json:"height_cm"`
+	CurrentWeightKG        int               `json:"current_weight_kg"`
+	TargetWeightKG         int               `json:"target_weight_kg"`
+	PrimaryGoal            string            `json:"primary_goal"`
+	ProgramDurationWeeks   int               `json:"program_duration_weeks"`
+	ExperienceLevel        string            `json:"experience_level"`
+	ActivityLevel          string            `json:"activity_level"`
+	TrainingLocation       string            `json:"training_location"`
+	Timezone               string            `json:"timezone"`
+	PreferredTrainingStyle string            `json:"preferred_training_style"`
+	PreferredMealStyle     string            `json:"preferred_meal_style"`
+	HydrationPreference    string            `json:"hydration_preference"`
+	AvailableTrainingDays  []AvailabilityDay `json:"available_training_days"`
+	EquipmentIDs           []string          `json:"equipment_ids"`
+	Injuries               []string          `json:"injuries"`
+	DietaryPreferences     []string          `json:"dietary_preferences"`
+	AvoidFoods             []string          `json:"avoid_foods"`
 }
 
 type AvailabilityDay struct {
@@ -256,19 +256,19 @@ type EquipmentItem struct {
 }
 
 type ExerciseItem struct {
-	ID           string            `json:"id"`
-	Slug         string            `json:"slug"`
-	Names        map[string]string `json:"names"`
-	Descriptions map[string]string `json:"descriptions"`
-	Technique    map[string]string `json:"technique"`
-	Movement     string            `json:"movement_pattern"`
-	Difficulty   string            `json:"difficulty"`
-	LocationType string            `json:"location_type"`
-	EquipmentIDs []string          `json:"equipment_ids"`
-	MediaURL     string            `json:"media_url"`
-	ContraindicationTags []string  `json:"contraindication_tags"`
-	SubstitutionIDs      []string  `json:"substitution_ids"`
-	Active       bool              `json:"active"`
+	ID                   string            `json:"id"`
+	Slug                 string            `json:"slug"`
+	Names                map[string]string `json:"names"`
+	Descriptions         map[string]string `json:"descriptions"`
+	Technique            map[string]string `json:"technique"`
+	Movement             string            `json:"movement_pattern"`
+	Difficulty           string            `json:"difficulty"`
+	LocationType         string            `json:"location_type"`
+	EquipmentIDs         []string          `json:"equipment_ids"`
+	MediaURL             string            `json:"media_url"`
+	ContraindicationTags []string          `json:"contraindication_tags"`
+	SubstitutionIDs      []string          `json:"substitution_ids"`
+	Active               bool              `json:"active"`
 }
 
 type AIProvider interface {

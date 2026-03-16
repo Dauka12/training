@@ -7,7 +7,8 @@ export type AuthState = {
   role: AuthRole;
   email: string;
   onboardingDone: boolean;
-  setAuthenticated: (payload: { role: AuthRole; email: string; onboardingDone: boolean }) => void;
+  mustChangePassword: boolean;
+  setAuthenticated: (payload: { role: AuthRole; email: string; onboardingDone: boolean; mustChangePassword?: boolean }) => void;
   clear: () => void;
 };
 
@@ -16,18 +17,21 @@ export const useAuthStore = create<AuthState>((set) => ({
   role: 'user',
   email: '',
   onboardingDone: false,
-  setAuthenticated: ({ role, email, onboardingDone }) =>
+  mustChangePassword: false,
+  setAuthenticated: ({ role, email, onboardingDone, mustChangePassword = false }) =>
     set({
       isAuthenticated: true,
       role,
       email,
-      onboardingDone
+      onboardingDone,
+      mustChangePassword
     }),
   clear: () =>
     set({
       isAuthenticated: false,
       role: 'user',
       email: '',
-      onboardingDone: false
+      onboardingDone: false,
+      mustChangePassword: false
     })
 }));

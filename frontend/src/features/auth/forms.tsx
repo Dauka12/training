@@ -90,6 +90,22 @@ export function ResetPasswordForm({ locale, onSubmit, pending, message, lead }: 
   );
 }
 
+export function ChangePasswordForm({ locale, onSubmit, pending, message, lead }: AuthFormProps) {
+  return (
+    <AuthForm
+      locale={locale}
+      titleKey="auth.changePassword.title"
+      submitKey="auth.changePassword.submit"
+      onSubmit={onSubmit}
+      pending={pending}
+      message={message}
+      lead={lead}
+      fields={['current_password', 'new_password']}
+      showGoogle={false}
+    />
+  );
+}
+
 function AuthForm({
   locale,
   titleKey,
@@ -100,7 +116,7 @@ function AuthForm({
   lead,
   fields,
   showGoogle = true
-}: AuthFormProps & { titleKey: string; submitKey: string; fields: Array<'email' | 'password' | 'token' | 'new_password'>; showGoogle?: boolean }) {
+}: AuthFormProps & { titleKey: string; submitKey: string; fields: Array<'email' | 'password' | 'token' | 'new_password' | 'current_password'>; showGoogle?: boolean }) {
   const [values, setValues] = useState<Record<string, string>>({});
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -156,12 +172,14 @@ function AuthForm({
   );
 }
 
-function labelFor(locale: SupportedLocale, field: 'email' | 'password' | 'token' | 'new_password') {
+function labelFor(locale: SupportedLocale, field: 'email' | 'password' | 'token' | 'new_password' | 'current_password') {
   switch (field) {
     case 'email':
       return t(locale, 'auth.email');
     case 'password':
       return t(locale, 'auth.password');
+    case 'current_password':
+      return t(locale, 'auth.currentPassword');
     case 'token':
       return t(locale, 'auth.token');
     default:
@@ -169,7 +187,7 @@ function labelFor(locale: SupportedLocale, field: 'email' | 'password' | 'token'
   }
 }
 
-function inputTypeFor(field: 'email' | 'password' | 'token' | 'new_password') {
+function inputTypeFor(field: 'email' | 'password' | 'token' | 'new_password' | 'current_password') {
   if (field === 'email') {
     return 'email';
   }
@@ -179,12 +197,14 @@ function inputTypeFor(field: 'email' | 'password' | 'token' | 'new_password') {
   return 'password';
 }
 
-function placeholderFor(locale: SupportedLocale, field: 'email' | 'password' | 'token' | 'new_password') {
+function placeholderFor(locale: SupportedLocale, field: 'email' | 'password' | 'token' | 'new_password' | 'current_password') {
   switch (field) {
     case 'email':
       return 'you@example.com';
     case 'password':
       return t(locale, 'auth.password');
+    case 'current_password':
+      return t(locale, 'auth.currentPassword');
     case 'token':
       return 'a1b2c3...';
     default:
@@ -192,7 +212,7 @@ function placeholderFor(locale: SupportedLocale, field: 'email' | 'password' | '
   }
 }
 
-function iconFor(field: 'email' | 'password' | 'token' | 'new_password') {
+function iconFor(field: 'email' | 'password' | 'token' | 'new_password' | 'current_password') {
   switch (field) {
     case 'email':
       return <Mail size={18} />;

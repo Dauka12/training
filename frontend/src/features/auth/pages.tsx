@@ -2,6 +2,7 @@ import { useState, type ReactNode } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useMutation } from '@tanstack/react-query';
 import {
+  ChangePasswordForm,
   ForgotPasswordForm,
   LoginForm,
   RegisterForm,
@@ -28,8 +29,13 @@ export function LoginPage({ locale, isAuthenticated }: { locale: SupportedLocale
       setAuthenticated({
         role: (me.roles[0] as AuthRole) ?? 'user',
         email: me.email,
-        onboardingDone: me.onboarding_done
+        onboardingDone: me.onboarding_done,
+        mustChangePassword: (me as { must_change_password?: boolean }).must_change_password ?? false
       });
+      if ((me as { must_change_password?: boolean }).must_change_password) {
+        navigate('/change-password');
+        return;
+      }
       navigate(me.onboarding_done ? '/today' : '/profile');
     },
     onError: (error: Error) => setMessage(error.message)
@@ -176,6 +182,45 @@ export function ResetPasswordPage({ locale }: { locale: SupportedLocale }) {
         pending={mutation.isPending}
         message={message}
         lead={t(locale, 'auth.reset.lead')}
+      />
+    </AuthScaffold>
+  );
+}
+
+export function ChangePasswordPage({ locale }: { locale: SupportedLocale }) {
+  const navigate = useNavigate();
+  const setAuthenticated = useAuthStore((state) => state.setAuthenticated);
+  const authRole = useAuthStore((state) => state.role);
+  const authEmail = useAuthStore((state) => state.email);
+  const onboardingDone = useAuthStore((state) => state.onboardingDone);
+  const [message, setMessage] = useState('');
+  const mutation = useMutation({
+    mutationFn: (payload: Record<string, string>) =>
+      apiRequest('/auth/change-password', {
+        method: 'POST',
+        body: JSON.stringify(payload)
+      }),
+    onSuccess: () => {
+      setAuthenticated({
+        role: authRole,
+        email: authEmail,
+        onboardingDone,
+        mustChangePassword: false
+      });
+      setMessage(t(locale, 'auth.success.passwordChanged'));
+      navigate(authRole === 'admin' ? '/admin' : onboardingDone ? '/today' : '/profile');
+    },
+    onError: (error: Error) => setMessage(error.message)
+  });
+
+  return (
+    <AuthScaffold locale={locale} footer={<Link to="/login">{t(locale, 'auth.links.login')}</Link>}>
+      <ChangePasswordForm
+        locale={locale}
+        onSubmit={mutation.mutateAsync}
+        pending={mutation.isPending}
+        message={message}
+        lead={t(locale, 'auth.changePassword.lead')}
       />
     </AuthScaffold>
   );

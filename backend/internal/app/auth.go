@@ -318,18 +318,18 @@ func (a *App) withRoles(next func(http.ResponseWriter, *http.Request, *User), ro
 
 func (a *App) handleMe(w http.ResponseWriter, _ *http.Request, user *User) {
 	writeJSON(w, http.StatusOK, map[string]any{
-		"id":                user.ID,
-		"email":             user.Email,
-		"locale":            user.Locale,
-		"theme":             user.Theme,
-		"roles":             user.Roles,
-		"verified":          user.Verified,
+		"id":                   user.ID,
+		"email":                user.Email,
+		"locale":               user.Locale,
+		"theme":                user.Theme,
+		"roles":                user.Roles,
+		"verified":             user.Verified,
 		"must_change_password": user.MustChangePassword,
-		"onboarding_done":   user.OnboardingDone,
-		"profile":           user.Profile,
-		"water_target_ml":   user.WaterTargetML,
-		"water_override_ml": user.WaterOverrideML,
-		"water_consumed_ml": user.WaterConsumed,
+		"onboarding_done":      user.OnboardingDone,
+		"profile":              user.Profile,
+		"water_target_ml":      user.WaterTargetML,
+		"water_override_ml":    user.WaterOverrideML,
+		"water_consumed_ml":    user.WaterConsumed,
 	})
 }
 

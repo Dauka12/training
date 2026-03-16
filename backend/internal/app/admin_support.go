@@ -1,6 +1,7 @@
 package app
 
 import (
+	"encoding/json"
 	"net/http"
 	"strings"
 	"time"
@@ -343,6 +344,31 @@ func (a *App) handleEquipmentCatalog(w http.ResponseWriter, r *http.Request, _ *
 	writeJSON(w, http.StatusOK, map[string]any{"items": items})
 }
 
+func (a *App) handleExerciseCatalogSubroutes(w http.ResponseWriter, r *http.Request, user *User) {
+	if r.Method != http.MethodGet {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+	exerciseID := strings.TrimPrefix(r.URL.Path, "/api/v1/catalog/exercises/")
+	if exerciseID == "" {
+		writeError(w, http.StatusNotFound, "not_found", "Not found")
+		return
+	}
+
+	a.mu.Lock()
+	defer a.mu.Unlock()
+
+	exercise := findExerciseByID(a.exerciseCatalog, exerciseID)
+	if exercise == nil || !exercise.Active {
+		writeError(w, http.StatusNotFound, "exercise_not_found", "Exercise not found")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{
+		"exercise": buildExerciseDetailPayload(user.Locale, *exercise, a.exerciseCatalog, a.equipmentCatalog),
+	})
+}
+
 func (a *App) handleAdminEquipment(w http.ResponseWriter, r *http.Request, user *User) {
 	switch r.Method {
 	case http.MethodGet:
@@ -389,6 +415,126 @@ func (a *App) handleAdminExercises(w http.ResponseWriter, r *http.Request, user 
 	default:
 		w.WriteHeader(http.StatusMethodNotAllowed)
 	}
+}
+
+func (a *App) handleAdminExerciseSubroutes(w http.ResponseWriter, r *http.Request, user *User) {
+	exerciseID := strings.TrimPrefix(r.URL.Path, "/api/v1/admin/catalog/exercises/")
+	if exerciseID == "" {
+		writeError(w, http.StatusNotFound, "not_found", "Not found")
+		return
+	}
+
+	switch r.Method {
+	case http.MethodPut:
+		var patch map[string]json.RawMessage
+		if !decodeJSON(w, r, &patch) {
+			return
+		}
+		a.mu.Lock()
+		defer a.mu.Unlock()
+		for index := range a.exerciseCatalog {
+			if a.exerciseCatalog[index].ID != exerciseID {
+				continue
+			}
+			updated := a.exerciseCatalog[index]
+			if value, ok := patch["slug"]; ok {
+				_ = json.Unmarshal(value, &updated.Slug)
+			}
+			if value, ok := patch["names"]; ok {
+				_ = json.Unmarshal(value, &updated.Names)
+			}
+			if value, ok := patch["descriptions"]; ok {
+				_ = json.Unmarshal(value, &updated.Descriptions)
+			}
+			if value, ok := patch["technique"]; ok {
+				_ = json.Unmarshal(value, &updated.Technique)
+			}
+			if value, ok := patch["movement_pattern"]; ok {
+				_ = json.Unmarshal(value, &updated.Movement)
+			}
+			if value, ok := patch["difficulty"]; ok {
+				_ = json.Unmarshal(value, &updated.Difficulty)
+			}
+			if value, ok := patch["location_type"]; ok {
+				_ = json.Unmarshal(value, &updated.LocationType)
+			}
+			if value, ok := patch["equipment_ids"]; ok {
+				_ = json.Unmarshal(value, &updated.EquipmentIDs)
+			}
+			if value, ok := patch["media_url"]; ok {
+				_ = json.Unmarshal(value, &updated.MediaURL)
+			}
+			if value, ok := patch["contraindication_tags"]; ok {
+				_ = json.Unmarshal(value, &updated.ContraindicationTags)
+			}
+			if value, ok := patch["substitution_ids"]; ok {
+				_ = json.Unmarshal(value, &updated.SubstitutionIDs)
+			}
+			if value, ok := patch["active"]; ok {
+				_ = json.Unmarshal(value, &updated.Active)
+			}
+			updated.ID = exerciseID
+			a.exerciseCatalog[index] = updated
+			a.recordAuditLocked(user.Email, "update_exercise", "exercise", exerciseID)
+			a.persistStateLocked()
+			writeJSON(w, http.StatusOK, map[string]any{"item": updated})
+			return
+		}
+		writeError(w, http.StatusNotFound, "exercise_not_found", "Exercise not found")
+	case http.MethodDelete:
+		a.mu.Lock()
+		defer a.mu.Unlock()
+		for index := range a.exerciseCatalog {
+			if a.exerciseCatalog[index].ID != exerciseID {
+				continue
+			}
+			a.exerciseCatalog[index].Active = false
+			a.recordAuditLocked(user.Email, "archive_exercise", "exercise", exerciseID)
+			a.persistStateLocked()
+			writeJSON(w, http.StatusOK, map[string]string{"status": "archived"})
+			return
+		}
+		writeError(w, http.StatusNotFound, "exercise_not_found", "Exercise not found")
+	default:
+		w.WriteHeader(http.StatusMethodNotAllowed)
+	}
+}
+
+func (a *App) handleAdminWgerPreview(w http.ResponseWriter, r *http.Request, _ *User) {
+	if r.Method != http.MethodPost {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+	if a.catalogImporter == nil {
+		writeError(w, http.StatusServiceUnavailable, "catalog_import_unavailable", "Catalog import unavailable")
+		return
+	}
+
+	var req struct {
+		Limit int `json:"limit"`
+	}
+	if !decodeJSON(w, r, &req) {
+		return
+	}
+
+	equipment, exercises, err := a.catalogImporter.ImportWger(r.Context(), req.Limit)
+	if err != nil {
+		a.log.Error("catalog preview failed", "error", err)
+		writeError(w, http.StatusBadGateway, "catalog_preview_failed", "Catalog preview failed")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{
+		"status": "ok",
+		"preview": map[string]any{
+			"equipment": equipment,
+			"exercises": exercises,
+			"counts": map[string]int{
+				"equipment": len(equipment),
+				"exercises": len(exercises),
+			},
+		},
+	})
 }
 
 func (a *App) handleAdminWgerImport(w http.ResponseWriter, r *http.Request, user *User) {
@@ -842,6 +988,55 @@ func isDiscussionStatus(value string) bool {
 	}
 }
 
+func findExerciseByID(items []ExerciseItem, exerciseID string) *ExerciseItem {
+	for index := range items {
+		if items[index].ID == exerciseID {
+			return &items[index]
+		}
+	}
+	return nil
+}
+
+func buildExerciseDetailPayload(locale string, exercise ExerciseItem, exercises []ExerciseItem, equipment []EquipmentItem) map[string]any {
+	equipmentItems := make([]map[string]string, 0, len(exercise.EquipmentIDs))
+	for _, equipmentID := range exercise.EquipmentIDs {
+		for _, item := range equipment {
+			if item.ID == equipmentID && item.Active {
+				equipmentItems = append(equipmentItems, map[string]string{
+					"id":   item.ID,
+					"name": translatedValue(locale, item.Names),
+				})
+				break
+			}
+		}
+	}
+
+	substitutions := make([]map[string]string, 0, len(exercise.SubstitutionIDs))
+	for _, substitutionID := range exercise.SubstitutionIDs {
+		if item := findExerciseByID(exercises, substitutionID); item != nil && item.Active {
+			substitutions = append(substitutions, map[string]string{
+				"id":   item.ID,
+				"name": translatedValue(locale, item.Names),
+			})
+		}
+	}
+
+	return map[string]any{
+		"id":                    exercise.ID,
+		"slug":                  exercise.Slug,
+		"name":                  translatedValue(locale, exercise.Names),
+		"description":           translatedValue(locale, exercise.Descriptions),
+		"technique":             translatedValue(locale, exercise.Technique),
+		"movement_pattern":      exercise.Movement,
+		"difficulty":            exercise.Difficulty,
+		"location_type":         exercise.LocationType,
+		"media_url":             exercise.MediaURL,
+		"contraindication_tags": append([]string(nil), exercise.ContraindicationTags...),
+		"equipment":             equipmentItems,
+		"substitutions":         substitutions,
+	}
+}
+
 func seedEquipmentCatalog() []EquipmentItem {
 	return []EquipmentItem{
 		{
@@ -879,12 +1074,14 @@ func seedExerciseCatalog() []ExerciseItem {
 				"ru": "Держите спину ровно",
 				"kk": "Arqany tike ustanyz",
 			},
-			Movement:     "squat",
-			Difficulty:   "beginner",
-			LocationType: "mixed",
-			EquipmentIDs: []string{"10000000-0000-0000-0000-000000000001"},
-			MediaURL:     "https://images.unsplash.com/photo-1517838277536-f5f99be501cd?auto=format&fit=crop&w=900&q=80",
-			Active:       true,
+			Movement:             "squat",
+			Difficulty:           "beginner",
+			LocationType:         "mixed",
+			EquipmentIDs:         []string{"10000000-0000-0000-0000-000000000001"},
+			ContraindicationTags: []string{"knee_pain", "low_back_sensitivity"},
+			SubstitutionIDs:      []string{"20000000-0000-0000-0000-000000000002"},
+			MediaURL:             "https://images.unsplash.com/photo-1517838277536-f5f99be501cd?auto=format&fit=crop&w=900&q=80",
+			Active:               true,
 		},
 		{
 			ID:   "20000000-0000-0000-0000-000000000002",
@@ -901,11 +1098,13 @@ func seedExerciseCatalog() []ExerciseItem {
 				"ru": "Корпус прямой",
 				"kk": "Deneni tike ustanyz",
 			},
-			Movement:     "push",
-			Difficulty:   "beginner",
-			LocationType: "home",
-			MediaURL:     "https://images.unsplash.com/photo-1598971639058-999dd0d1f8b8?auto=format&fit=crop&w=900&q=80",
-			Active:       true,
+			Movement:             "push",
+			Difficulty:           "beginner",
+			LocationType:         "home",
+			ContraindicationTags: []string{"wrist_irritation"},
+			SubstitutionIDs:      []string{"20000000-0000-0000-0000-000000000001"},
+			MediaURL:             "https://images.unsplash.com/photo-1598971639058-999dd0d1f8b8?auto=format&fit=crop&w=900&q=80",
+			Active:               true,
 		},
 	}
 }
@@ -923,7 +1122,7 @@ func mergeImportedEquipment(target *[]EquipmentItem, imported []ImportedEquipmen
 	importedCount := 0
 	for _, item := range imported {
 		candidate := EquipmentItem{
-			ID: item.SourceID,
+			ID: normalizeImportedEquipmentID(item.SourceID),
 			Names: map[string]string{
 				"ru": item.Name,
 				"kk": item.Name,
@@ -965,8 +1164,12 @@ func mergeImportedExercises(target *[]ExerciseItem, imported []ImportedExercise)
 		name := fallbackString(item.NameEN, item.Slug)
 		description := fallbackString(item.DescriptionEN, name)
 		technique := fallbackString(item.TechniqueEN, description)
+		equipmentIDs := make([]string, 0, len(item.EquipmentIDs))
+		for _, equipmentID := range item.EquipmentIDs {
+			equipmentIDs = append(equipmentIDs, normalizeImportedEquipmentID(equipmentID))
+		}
 		candidate := ExerciseItem{
-			ID:   item.SourceID,
+			ID:   normalizeImportedExerciseID(item.SourceID),
 			Slug: fallbackString(item.Slug, slugify(name)),
 			Names: map[string]string{
 				"ru": name,
@@ -983,12 +1186,14 @@ func mergeImportedExercises(target *[]ExerciseItem, imported []ImportedExercise)
 				"kk": technique,
 				"en": technique,
 			},
-			Movement:     fallbackString(item.Movement, "general"),
-			Difficulty:   fallbackString(item.Difficulty, "beginner"),
-			LocationType: fallbackString(item.LocationType, "mixed"),
-			EquipmentIDs: append([]string(nil), item.EquipmentIDs...),
-			MediaURL:     item.MediaURL,
-			Active:       true,
+			Movement:             fallbackString(item.Movement, "general"),
+			Difficulty:           fallbackString(item.Difficulty, "beginner"),
+			LocationType:         fallbackString(item.LocationType, "mixed"),
+			EquipmentIDs:         equipmentIDs,
+			ContraindicationTags: []string{},
+			SubstitutionIDs:      []string{},
+			MediaURL:             item.MediaURL,
+			Active:               true,
 		}
 		if index, ok := existing[candidate.ID]; ok {
 			(*target)[index] = candidate
@@ -1000,4 +1205,26 @@ func mergeImportedExercises(target *[]ExerciseItem, imported []ImportedExercise)
 	}
 
 	return importedCount
+}
+
+func normalizeImportedEquipmentID(sourceID string) string {
+	trimmed := strings.TrimSpace(sourceID)
+	if trimmed == "" {
+		return ""
+	}
+	if strings.HasPrefix(trimmed, "wger-equipment-") {
+		return trimmed
+	}
+	return "wger-equipment-" + trimmed
+}
+
+func normalizeImportedExerciseID(sourceID string) string {
+	trimmed := strings.TrimSpace(sourceID)
+	if trimmed == "" {
+		return ""
+	}
+	if strings.HasPrefix(trimmed, "wger-exercise-") {
+		return trimmed
+	}
+	return "wger-exercise-" + trimmed
 }

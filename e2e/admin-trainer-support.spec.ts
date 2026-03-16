@@ -22,12 +22,12 @@ test('admin can assign trainer and trainer can review user and create support no
   const equipmentName = `Тестовое оборудование ${Date.now()}`;
   await page.getByLabel(t('ru', 'admin.addEquipment')).fill(equipmentName);
   await page.getByRole('button', { name: t('ru', 'admin.addEquipment') }).click();
-  await expect(page.getByText(equipmentName)).toBeVisible();
+  await expect(page.locator('article').filter({ hasText: equipmentName }).first()).toBeVisible();
 
   const exerciseName = `Тестовое упражнение ${Date.now()}`;
   await page.getByLabel(t('ru', 'admin.addExercise')).fill(exerciseName);
   await page.getByRole('button', { name: t('ru', 'admin.addExercise') }).click();
-  await expect(page.getByText(exerciseName)).toBeVisible();
+  await expect(page.locator('article').filter({ hasText: exerciseName }).first()).toBeVisible();
 
   await logout(page);
   await login(page, email, password);

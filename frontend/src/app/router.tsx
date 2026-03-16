@@ -4,13 +4,14 @@ import { BrowserRouter, Link, MemoryRouter, NavLink, Navigate, Route, Routes, us
 import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query';
 import { Activity, BadgeHelp, BellDot, CalendarDays, ChartNoAxesCombined, CircleUserRound, ClipboardList, House, LayoutDashboard, LogOut, ShieldCheck, Users } from 'lucide-react';
 import {
+  ChangePasswordPage,
   ForgotPasswordPage,
   LoginPage,
   RegisterPage,
   ResetPasswordPage,
   VerifyPage
 } from '../features/auth/pages';
-import { PlanPage, ProgressPage, TodayPage, TrackPage } from '../features/dashboard/pages';
+import { ExercisePage, PlanPage, ProgressPage, TodayPage, TrackPage } from '../features/dashboard/pages';
 import { AdminPage, TrainerPage } from '../features/panels/pages';
 import { ProfilePage } from '../features/profile/ProfilePage';
 import { SupportPage } from '../features/support/SupportPage';
@@ -19,7 +20,7 @@ import { useAuthStore, type AuthRole, type AuthState } from '../shared/auth/stor
 import { t, type SupportedLocale } from '../shared/i18n';
 import { SectionPage } from '../shared/ui/forms';
 
-type AuthSnapshot = Pick<AuthState, 'isAuthenticated' | 'role'> & { email?: string; onboardingDone?: boolean };
+type AuthSnapshot = Pick<AuthState, 'isAuthenticated' | 'role'> & { email?: string; onboardingDone?: boolean; mustChangePassword?: boolean };
 type NavItem = { to: string; label: string; icon: ReactElement };
 
 export function AppRouter({
@@ -70,14 +71,16 @@ function AppRoutes({ locale, authOverride }: { locale: SupportedLocale; authOver
       <Route path="/verify-email" element={<VerifyPage locale={locale} />} />
       <Route path="/forgot-password" element={<ForgotPasswordPage locale={locale} />} />
       <Route path="/reset-password" element={<ResetPasswordPage locale={locale} />} />
-      <Route path="/today" element={<Protected locale={locale} auth={effectiveAuth}><RequiresOnboarding auth={effectiveAuth}><Shell locale={locale} auth={effectiveAuth}><TodayPage locale={locale} /></Shell></RequiresOnboarding></Protected>} />
-      <Route path="/plan" element={<Protected locale={locale} auth={effectiveAuth}><RequiresOnboarding auth={effectiveAuth}><Shell locale={locale} auth={effectiveAuth}><PlanPage locale={locale} /></Shell></RequiresOnboarding></Protected>} />
-      <Route path="/track" element={<Protected locale={locale} auth={effectiveAuth}><RequiresOnboarding auth={effectiveAuth}><Shell locale={locale} auth={effectiveAuth}><TrackPage locale={locale} /></Shell></RequiresOnboarding></Protected>} />
-      <Route path="/progress" element={<Protected locale={locale} auth={effectiveAuth}><RequiresOnboarding auth={effectiveAuth}><Shell locale={locale} auth={effectiveAuth}><ProgressPage locale={locale} /></Shell></RequiresOnboarding></Protected>} />
-      <Route path="/profile" element={<Protected locale={locale} auth={effectiveAuth}><Shell locale={locale} auth={effectiveAuth}><ProfilePage locale={locale} /></Shell></Protected>} />
-      <Route path="/support" element={<Protected locale={locale} auth={effectiveAuth}><Shell locale={locale} auth={effectiveAuth}><SupportPage locale={locale} /></Shell></Protected>} />
-      <Route path="/trainer" element={<Protected locale={locale} auth={effectiveAuth}><Shell locale={locale} auth={effectiveAuth}><RoleGate locale={locale} auth={effectiveAuth} roles={['trainer', 'admin']}><TrainerPage locale={locale} /></RoleGate></Shell></Protected>} />
-      <Route path="/admin" element={<Protected locale={locale} auth={effectiveAuth}><Shell locale={locale} auth={effectiveAuth}><RoleGate locale={locale} auth={effectiveAuth} roles={['admin']}><AdminPage locale={locale} /></RoleGate></Shell></Protected>} />
+      <Route path="/change-password" element={<Protected locale={locale} auth={effectiveAuth}><ChangePasswordPage locale={locale} /></Protected>} />
+      <Route path="/today" element={<Protected locale={locale} auth={effectiveAuth}><RequiresPasswordChange auth={effectiveAuth}><RequiresOnboarding auth={effectiveAuth}><Shell locale={locale} auth={effectiveAuth}><TodayPage locale={locale} /></Shell></RequiresOnboarding></RequiresPasswordChange></Protected>} />
+      <Route path="/plan" element={<Protected locale={locale} auth={effectiveAuth}><RequiresPasswordChange auth={effectiveAuth}><RequiresOnboarding auth={effectiveAuth}><Shell locale={locale} auth={effectiveAuth}><PlanPage locale={locale} /></Shell></RequiresOnboarding></RequiresPasswordChange></Protected>} />
+      <Route path="/track" element={<Protected locale={locale} auth={effectiveAuth}><RequiresPasswordChange auth={effectiveAuth}><RequiresOnboarding auth={effectiveAuth}><Shell locale={locale} auth={effectiveAuth}><TrackPage locale={locale} /></Shell></RequiresOnboarding></RequiresPasswordChange></Protected>} />
+      <Route path="/progress" element={<Protected locale={locale} auth={effectiveAuth}><RequiresPasswordChange auth={effectiveAuth}><RequiresOnboarding auth={effectiveAuth}><Shell locale={locale} auth={effectiveAuth}><ProgressPage locale={locale} /></Shell></RequiresOnboarding></RequiresPasswordChange></Protected>} />
+      <Route path="/exercise/:exerciseID" element={<Protected locale={locale} auth={effectiveAuth}><RequiresPasswordChange auth={effectiveAuth}><RequiresOnboarding auth={effectiveAuth}><Shell locale={locale} auth={effectiveAuth}><ExercisePage locale={locale} /></Shell></RequiresOnboarding></RequiresPasswordChange></Protected>} />
+      <Route path="/profile" element={<Protected locale={locale} auth={effectiveAuth}><RequiresPasswordChange auth={effectiveAuth}><Shell locale={locale} auth={effectiveAuth}><ProfilePage locale={locale} /></Shell></RequiresPasswordChange></Protected>} />
+      <Route path="/support" element={<Protected locale={locale} auth={effectiveAuth}><RequiresPasswordChange auth={effectiveAuth}><Shell locale={locale} auth={effectiveAuth}><SupportPage locale={locale} /></Shell></RequiresPasswordChange></Protected>} />
+      <Route path="/trainer" element={<Protected locale={locale} auth={effectiveAuth}><RequiresPasswordChange auth={effectiveAuth}><Shell locale={locale} auth={effectiveAuth}><RoleGate locale={locale} auth={effectiveAuth} roles={['trainer', 'admin']}><TrainerPage locale={locale} /></RoleGate></Shell></RequiresPasswordChange></Protected>} />
+      <Route path="/admin" element={<Protected locale={locale} auth={effectiveAuth}><RequiresPasswordChange auth={effectiveAuth}><Shell locale={locale} auth={effectiveAuth}><RoleGate locale={locale} auth={effectiveAuth} roles={['admin']}><AdminPage locale={locale} /></RoleGate></Shell></RequiresPasswordChange></Protected>} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
@@ -93,6 +96,13 @@ function Protected({ auth, locale, children }: { auth: AuthSnapshot; locale: Sup
 function RequiresOnboarding({ auth, children }: { auth: AuthSnapshot; children: ReactElement }) {
   if (auth.role === 'user' && auth.onboardingDone === false) {
     return <Navigate to="/profile" replace />;
+  }
+  return children;
+}
+
+function RequiresPasswordChange({ auth, children }: { auth: AuthSnapshot; children: ReactElement }) {
+  if (auth.mustChangePassword) {
+    return <Navigate to="/change-password" replace />;
   }
   return children;
 }

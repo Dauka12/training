@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 )
 
@@ -22,6 +23,9 @@ type Config struct {
 	GoogleClientID         string
 	GoogleClientSecret     string
 	GoogleRedirectURL      string
+	WgerSyncEnabled        bool
+	WgerSyncIntervalMin    int
+	WgerSyncLimit          int
 }
 
 func Load() Config {
@@ -43,6 +47,9 @@ func Load() Config {
 		GoogleClientID:         getEnv("GOOGLE_CLIENT_ID", ""),
 		GoogleClientSecret:     getEnv("GOOGLE_CLIENT_SECRET", ""),
 		GoogleRedirectURL:      getEnv("GOOGLE_REDIRECT_URL", ""),
+		WgerSyncEnabled:        strings.EqualFold(getEnv("WGER_SYNC_ENABLED", "false"), "true"),
+		WgerSyncIntervalMin:    getEnvInt("WGER_SYNC_INTERVAL_MINUTES", 720),
+		WgerSyncLimit:          getEnvInt("WGER_SYNC_LIMIT", 12),
 	}
 }
 
@@ -76,6 +83,18 @@ func getEnv(key, fallback string) string {
 		return value
 	}
 	return fallback
+}
+
+func getEnvInt(key string, fallback int) int {
+	value := getEnv(key, "")
+	if value == "" {
+		return fallback
+	}
+	parsed, err := strconv.Atoi(value)
+	if err != nil {
+		return fallback
+	}
+	return parsed
 }
 
 func resolveListenAddr(appAddr, appPort string) string {

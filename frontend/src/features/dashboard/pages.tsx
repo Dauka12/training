@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Link } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
 import { NotificationCenter } from '../notifications/NotificationCenter';
 import { WaterTracker } from '../tracking/WaterTracker';
 import { apiRequest } from '../../shared/api/client';
@@ -299,7 +299,9 @@ export function PlanPage({ locale }: { locale: SupportedLocale }) {
                               {day.exercises.map((exercise) => (
                                 <article key={`${day.session_name}-${exercise.exercise_id}-${exercise.order}`} className="notice notice--subtle exercise-card">
                                   <div className="section-header">
-                                    <strong>{exercise.exercise_name || exercise.exercise_id}</strong>
+                                    <strong>
+                                      <Link to={`/exercise/${exercise.exercise_id}`}>{exercise.exercise_name || exercise.exercise_id}</Link>
+                                    </strong>
                                     <span className="badge badge--soft">{exercise.sets} x {exercise.reps}</span>
                                   </div>
                                   {exercise.effort_note ? <span>{exercise.effort_note}</span> : null}
@@ -333,6 +335,113 @@ export function PlanPage({ locale }: { locale: SupportedLocale }) {
           </div>
         </section>
       ) : null}
+    </div>
+  );
+}
+
+export function ExercisePage({ locale }: { locale: SupportedLocale }) {
+  const { exerciseID = '' } = useParams();
+  const exerciseQuery = useQuery({
+    queryKey: ['exercise-detail', exerciseID],
+    enabled: Boolean(exerciseID),
+    queryFn: () =>
+      apiRequest<{
+        exercise: {
+          id: string;
+          slug: string;
+          name: string;
+          description: string;
+          technique: string;
+          movement_pattern: string;
+          difficulty: string;
+          location_type: string;
+          media_url: string;
+          contraindication_tags: string[];
+          equipment: Array<{ id: string; name: string }>;
+          substitutions: Array<{ id: string; name: string }>;
+        };
+      }>(`/catalog/exercises/${exerciseID}`)
+  });
+
+  if (exerciseQuery.isLoading) {
+    return <SectionPage title={t(locale, 'common.loading')} />;
+  }
+
+  const exercise = exerciseQuery.data?.exercise;
+  if (!exercise) {
+    return <SectionPage title={t(locale, 'common.empty')} />;
+  }
+
+  return (
+    <div className="page-stack page-stack--exercise">
+      <section className="card page-intro">
+        <div className="section-header">
+          <div>
+            <h1>{exercise.name}</h1>
+            <p className="muted">{exercise.description}</p>
+          </div>
+          <div className="shell-highlights">
+            <span className="badge badge--soft">{exercise.movement_pattern}</span>
+            <span className="badge badge--soft">{exercise.difficulty}</span>
+          </div>
+        </div>
+      </section>
+
+      <section className="plan-layout">
+        <aside className="plan-layout__aside">
+          <section className="card card--panel plan-panel">
+            {exercise.media_url ? <img className="exercise-media" src={exercise.media_url} alt={exercise.name} /> : null}
+            <div className="stats-grid stats-grid--dense">
+              <CardStat title={t(locale, 'exercise.location')} value={exercise.location_type} />
+              <CardStat title={t(locale, 'exercise.equipment')} value={String(exercise.equipment.length)} />
+            </div>
+          </section>
+        </aside>
+
+        <div className="plan-layout__main">
+          <section className="card card--panel plan-panel">
+            <h2>{t(locale, 'exercise.technique')}</h2>
+            <p>{exercise.technique}</p>
+          </section>
+
+          {exercise.contraindication_tags.length > 0 ? (
+            <section className="card card--panel plan-panel">
+              <h2>{t(locale, 'exercise.contraindications')}</h2>
+              <div className="shell-highlights">
+                {exercise.contraindication_tags.map((tag) => (
+                  <span key={tag} className="badge badge--soft">{tag}</span>
+                ))}
+              </div>
+            </section>
+          ) : null}
+
+          {exercise.equipment.length > 0 ? (
+            <section className="card card--panel plan-panel">
+              <h2>{t(locale, 'exercise.equipment')}</h2>
+              <div className="stack">
+                {exercise.equipment.map((item) => (
+                  <article key={item.id} className="notice notice--subtle">
+                    <strong>{item.name}</strong>
+                  </article>
+                ))}
+              </div>
+            </section>
+          ) : null}
+
+          {exercise.substitutions.length > 0 ? (
+            <section className="card card--panel plan-panel">
+              <h2>{t(locale, 'exercise.substitutions')}</h2>
+              <div className="stack">
+                {exercise.substitutions.map((item) => (
+                  <article key={item.id} className="notice notice--subtle">
+                    <Link to={`/exercise/${item.id}`}>{item.name}</Link>
+                  </article>
+                ))}
+              </div>
+            </section>
+          ) : null}
+        </div>
+      </section>
     </div>
   );
 }

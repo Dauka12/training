@@ -20,13 +20,14 @@ export function App() {
   useEffect(() => {
     let cancelled = false;
 
-    apiRequest<{ email: string; locale: 'ru' | 'kk'; theme: 'light' | 'dark'; roles: string[]; onboarding_done: boolean }>('/me')
+    apiRequest<{ email: string; locale: 'ru' | 'kk'; theme: 'light' | 'dark'; roles: string[]; onboarding_done: boolean; must_change_password: boolean }>('/me')
       .then((response) => {
         if (!cancelled) {
           setAuthenticated({
             role: (response.roles[0] as 'user' | 'trainer' | 'admin') ?? 'user',
             email: response.email,
-            onboardingDone: response.onboarding_done
+            onboardingDone: response.onboarding_done,
+            mustChangePassword: response.must_change_password
           });
           hydrateFromServer({ locale: response.locale, theme: response.theme });
         }

@@ -60,6 +60,9 @@ func main() {
 		options = append(options, app.WithGoogleAuthProvider(provider))
 	}
 	application := app.New(logger, options...)
+	if cfg.WgerSyncEnabled {
+		application.StartCatalogSync(context.Background(), time.Duration(cfg.WgerSyncIntervalMin)*time.Minute, cfg.WgerSyncLimit)
+	}
 	server := &http.Server{
 		Addr:              cfg.ListenAddr,
 		Handler:           application.Routes(),

@@ -171,7 +171,7 @@ test('admin page shows repository-backed operational sections', async () => {
   expect(await screen.findByText('Meal prep ideas')).toBeInTheDocument();
   expect(await screen.findByText('План обновлен')).toBeInTheDocument();
   expect(await screen.findByText('Гантели')).toBeInTheDocument();
-  expect(await screen.findByText('Отжимания')).toBeInTheDocument();
+  expect((await screen.findAllByText('Отжимания')).length).toBeGreaterThan(0);
   expect(await screen.findByText('Весенний план')).toBeInTheDocument();
   expect(await screen.findByText('Напоминание о воде')).toBeInTheDocument();
   expect(await screen.findByText('assign_trainer')).toBeInTheDocument();
@@ -352,6 +352,117 @@ test('admin can trigger external catalog import from the panel', async () => {
         method: 'POST',
         credentials: 'include',
         body: JSON.stringify({ limit: 12 })
+      })
+    )
+  );
+});
+
+test('admin can preview external catalog import and edit exercise media metadata', async () => {
+  fetchMock.mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = String(input);
+    if (url.endsWith('/admin/users')) {
+      return Response.json({ items: [] });
+    }
+    if (url.endsWith('/admin/trainers')) {
+      return Response.json({ items: [] });
+    }
+    if (
+      url.endsWith('/admin/support/threads') ||
+      url.endsWith('/admin/discussions/threads') ||
+      url.endsWith('/admin/logs/notifications') ||
+      url.endsWith('/admin/logs/ai') ||
+      url.endsWith('/admin/logs/email') ||
+      url.endsWith('/admin/logs/audit')
+    ) {
+      return Response.json({ items: [] });
+    }
+    if (url.endsWith('/admin/catalog/equipment')) {
+      return Response.json({ items: [{ id: 'eq-1', names: { ru: 'Гантели' }, category: 'weights' }] });
+    }
+    if (url.endsWith('/admin/catalog/exercises') && (!init?.method || init.method === 'GET')) {
+      return Response.json({ items: [{ id: 'ex-1', names: { ru: 'Отжимания' }, slug: 'push-up' }] });
+    }
+    if (url.endsWith('/catalog/exercises/ex-1')) {
+      return Response.json({
+        exercise: {
+          id: 'ex-1',
+          slug: 'push-up',
+          name: 'Отжимания',
+          description: 'Базовое упражнение на верх тела',
+          technique: 'Держите корпус прямым.',
+          movement_pattern: 'push',
+          difficulty: 'beginner',
+          location_type: 'home',
+          media_url: 'https://example.com/push-up.jpg',
+          contraindication_tags: ['wrist_irritation'],
+          equipment: [],
+          substitutions: [{ id: 'ex-2', name: 'Жим гантелей лежа' }]
+        }
+      });
+    }
+    if (url.endsWith('/admin/catalog/import/wger/preview') && init?.method === 'POST') {
+      return Response.json({
+        status: 'ok',
+        preview: {
+          counts: { equipment: 1, exercises: 1 },
+          equipment: [{ source_id: '7', name: 'Kettlebell', category: 'weights', location_type: 'mixed' }],
+          exercises: [
+            {
+              source_id: '70',
+              slug: 'kettlebell-swing',
+              name_en: 'Kettlebell Swing',
+              description_en: 'Hip hinge movement',
+              technique_en: 'Drive with the hips',
+              movement: 'hinge',
+              difficulty: 'intermediate',
+              location_type: 'mixed',
+              equipment_ids: ['wger-equipment-7'],
+              media_url: 'https://wger.example/swing.jpg'
+            }
+          ]
+        }
+      });
+    }
+    if (url.endsWith('/admin/catalog/exercises/ex-1') && init?.method === 'PUT') {
+      return Response.json({ item: { id: 'ex-1' } });
+    }
+    return Response.json({});
+  });
+  vi.stubGlobal('fetch', fetchMock);
+
+  const user = userEvent.setup();
+  renderWithClient(<AdminPage locale="ru" />);
+
+  expect((await screen.findAllByText('Отжимания')).length).toBeGreaterThan(0);
+
+  await user.click(screen.getByRole('button', { name: t('ru', 'admin.previewWger') }));
+  expect(await screen.findByText('Kettlebell Swing')).toBeInTheDocument();
+
+  await user.selectOptions(screen.getByLabelText(t('ru', 'admin.exerciseEditor')), 'ex-1');
+  expect(await screen.findByDisplayValue('https://example.com/push-up.jpg')).toBeInTheDocument();
+
+  await user.clear(screen.getByLabelText(t('ru', 'admin.exerciseMedia')));
+  await user.type(screen.getByLabelText(t('ru', 'admin.exerciseMedia')), 'https://example.com/push-up-v2.jpg');
+  await user.clear(screen.getByLabelText(t('ru', 'admin.exerciseTechnique')));
+  await user.type(screen.getByLabelText(t('ru', 'admin.exerciseTechnique')), 'Keep shoulders packed and the body aligned.');
+  await user.clear(screen.getByLabelText(t('ru', 'admin.exerciseContraindications')));
+  await user.type(screen.getByLabelText(t('ru', 'admin.exerciseContraindications')), 'wrist_irritation, shoulder_pain');
+  await user.clear(screen.getByLabelText(t('ru', 'admin.exerciseSubstitutions')));
+  await user.type(screen.getByLabelText(t('ru', 'admin.exerciseSubstitutions')), 'ex-2');
+  await user.click(screen.getByRole('button', { name: t('ru', 'admin.saveExerciseMeta') }));
+
+  await waitFor(() =>
+    expect(fetchMock).toHaveBeenCalledWith(
+      'http://localhost:8080/api/v1/admin/catalog/exercises/ex-1',
+      expect.objectContaining({
+        method: 'PUT',
+        credentials: 'include',
+        body: JSON.stringify({
+          media_url: 'https://example.com/push-up-v2.jpg',
+          technique: { ru: 'Keep shoulders packed and the body aligned.' },
+          contraindication_tags: ['wrist_irritation', 'shoulder_pain'],
+          substitution_ids: ['ex-2']
+        })
       })
     )
   );

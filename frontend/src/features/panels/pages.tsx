@@ -1,8 +1,8 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiRequest } from '../../shared/api/client';
 import { t, type SupportedLocale } from '../../shared/i18n';
-import { EmptyState, Field, SelectField } from '../../shared/ui/forms';
+import { EmptyState, Field, SelectField, TextAreaField, splitComma } from '../../shared/ui/forms';
 
 type TrainerUser = { email: string; plan_health: string; workouts: number };
 type TrainerUserDetail = {
@@ -14,6 +14,21 @@ type TrainerUserDetail = {
   assigned_trainer?: string;
 };
 type TrainerNote = { id: string; trainer_email: string; user_email: string; body: string; created_at: string };
+type AdminExercise = { id: string; names?: Record<string, string>; slug: string };
+type ExerciseDetail = {
+  id: string;
+  slug: string;
+  name: string;
+  description: string;
+  technique: string;
+  movement_pattern: string;
+  difficulty: string;
+  location_type: string;
+  media_url: string;
+  contraindication_tags: string[];
+  equipment: Array<{ id: string; name: string }>;
+  substitutions: Array<{ id: string; name: string }>;
+};
 
 export function TrainerPage({ locale }: { locale: SupportedLocale }) {
   const queryClient = useQueryClient();
@@ -178,11 +193,21 @@ export function AdminPage({ locale }: { locale: SupportedLocale }) {
   const queryClient = useQueryClient();
   const [equipmentName, setEquipmentName] = useState('');
   const [exerciseName, setExerciseName] = useState('');
+  const [selectedExerciseID, setSelectedExerciseID] = useState('');
+  const [exerciseMediaURL, setExerciseMediaURL] = useState('');
+  const [exerciseTechnique, setExerciseTechnique] = useState('');
+  const [exerciseContraindications, setExerciseContraindications] = useState('');
+  const [exerciseSubstitutions, setExerciseSubstitutions] = useState('');
   const [memberEmail, setMemberEmail] = useState('');
   const [trainerEmail, setTrainerEmail] = useState('trainer@local.test');
   const [supportStatuses, setSupportStatuses] = useState<Record<string, string>>({});
   const [supportAssignees, setSupportAssignees] = useState<Record<string, string>>({});
   const [discussionStatuses, setDiscussionStatuses] = useState<Record<string, string>>({});
+  const [previewData, setPreviewData] = useState<{
+    counts: { equipment: number; exercises: number };
+    equipment: Array<{ source_id?: string; name?: string }>;
+    exercises: Array<{ source_id?: string; name_en?: string; slug?: string; media_url?: string }>;
+  } | null>(null);
 
   const adminUsers = useQuery({
     queryKey: ['admin-users'],
@@ -240,7 +265,13 @@ export function AdminPage({ locale }: { locale: SupportedLocale }) {
   const exercises = useQuery({
     queryKey: ['admin-exercises'],
     queryFn: () =>
-      apiRequest<{ items: Array<{ id: string; names?: Record<string, string>; slug: string }> }>('/admin/catalog/exercises')
+      apiRequest<{ items: AdminExercise[] }>('/admin/catalog/exercises')
+  });
+
+  const exerciseDetail = useQuery({
+    queryKey: ['admin-exercise-detail', selectedExerciseID],
+    enabled: Boolean(selectedExerciseID),
+    queryFn: () => apiRequest<{ exercise: ExerciseDetail }>(`/catalog/exercises/${selectedExerciseID}`)
   });
 
   const aiLogs = useQuery({
@@ -357,6 +388,55 @@ export function AdminPage({ locale }: { locale: SupportedLocale }) {
     }
   });
 
+  const previewCatalog = useMutation({
+    mutationFn: () =>
+      apiRequest<{
+        preview: {
+          counts: { equipment: number; exercises: number };
+          equipment: Array<{ source_id?: string; name?: string }>;
+          exercises: Array<{ source_id?: string; name_en?: string; slug?: string; media_url?: string }>;
+        };
+      }>('/admin/catalog/import/wger/preview', {
+        method: 'POST',
+        body: JSON.stringify({ limit: 6 })
+      }),
+    onSuccess: (response) => setPreviewData(response.preview)
+  });
+
+  const saveExerciseMeta = useMutation({
+    mutationFn: () =>
+      apiRequest(`/admin/catalog/exercises/${selectedExerciseID}`, {
+        method: 'PUT',
+        body: JSON.stringify({
+          media_url: exerciseMediaURL,
+          technique: { ru: exerciseTechnique },
+          contraindication_tags: splitComma(exerciseContraindications),
+          substitution_ids: splitComma(exerciseSubstitutions)
+        })
+      }),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['admin-exercises'] });
+      await queryClient.invalidateQueries({ queryKey: ['admin-exercise-detail', selectedExerciseID] });
+      await queryClient.invalidateQueries({ queryKey: ['admin-audit-logs'] });
+    }
+  });
+
+  useEffect(() => {
+    if (!selectedExerciseID && exercises.data?.items?.length) {
+      setSelectedExerciseID(exercises.data.items[0].id);
+    }
+  }, [exercises.data, selectedExerciseID]);
+
+  useEffect(() => {
+    if (!exerciseDetail.data?.exercise) {
+      return;
+    }
+    setExerciseMediaURL(exerciseDetail.data.exercise.media_url ?? '');
+    setExerciseTechnique(exerciseDetail.data.exercise.technique ?? '');
+    setExerciseContraindications(exerciseDetail.data.exercise.contraindication_tags.join(', '));
+    setExerciseSubstitutions(exerciseDetail.data.exercise.substitutions.map((item) => item.id).join(', '));
+  }, [exerciseDetail.data]);
+
   return (
     <div className="page-stack page-stack--ops">
       <section className="card card--panel ops-hero">
@@ -460,10 +540,36 @@ export function AdminPage({ locale }: { locale: SupportedLocale }) {
           <h2>{t(locale, 'admin.equipment')}</h2>
           <p className="muted">{t(locale, 'admin.importHint')}</p>
           <div className="button-row">
+            <button type="button" className="button" onClick={() => previewCatalog.mutate()}>
+              {t(locale, 'admin.previewWger')}
+            </button>
             <button type="button" className="button button--ghost" onClick={() => importCatalog.mutate()}>
               {t(locale, 'admin.importWger')}
             </button>
           </div>
+          {previewData ? (
+            <section className="notice notice--subtle">
+              <strong>{t(locale, 'admin.previewSamples')}</strong>
+              <div className="stats-grid stats-grid--dense">
+                <article className="stat">
+                  <span className="muted">{t(locale, 'admin.equipment')}</span>
+                  <strong>{previewData.counts.equipment}</strong>
+                </article>
+                <article className="stat">
+                  <span className="muted">{t(locale, 'admin.exercises')}</span>
+                  <strong>{previewData.counts.exercises}</strong>
+                </article>
+              </div>
+              <div className="stack">
+                {previewData.exercises.map((item) => (
+                  <article key={item.source_id ?? item.slug} className="notice notice--subtle">
+                    <strong>{item.name_en ?? item.slug}</strong>
+                    <span className="muted">{item.media_url || '-'}</span>
+                  </article>
+                ))}
+              </div>
+            </section>
+          ) : null}
           <Field label={t(locale, 'admin.addEquipment')} value={equipmentName} onChange={setEquipmentName} />
           <div className="button-row">
             <button
@@ -506,6 +612,49 @@ export function AdminPage({ locale }: { locale: SupportedLocale }) {
               </article>
             ))}
           </div>
+
+          <section className="ops-editor">
+            <SelectField
+              label={t(locale, 'admin.exerciseEditor')}
+              value={selectedExerciseID}
+              onChange={setSelectedExerciseID}
+              options={[
+                { value: '', label: t(locale, 'common.empty') },
+                ...(exercises.data?.items ?? []).map((item) => ({
+                  value: item.id,
+                  label: item.names?.ru ?? item.slug
+                }))
+              ]}
+            />
+            <Field label={t(locale, 'admin.exerciseMedia')} value={exerciseMediaURL} onChange={setExerciseMediaURL} />
+            <TextAreaField label={t(locale, 'admin.exerciseTechnique')} value={exerciseTechnique} onChange={setExerciseTechnique} />
+            <Field
+              label={t(locale, 'admin.exerciseContraindications')}
+              value={exerciseContraindications}
+              onChange={setExerciseContraindications}
+            />
+            <Field
+              label={t(locale, 'admin.exerciseSubstitutions')}
+              value={exerciseSubstitutions}
+              onChange={setExerciseSubstitutions}
+            />
+            <div className="button-row">
+              <button
+                type="button"
+                className="button button--primary"
+                onClick={() => saveExerciseMeta.mutate()}
+                disabled={!selectedExerciseID}
+              >
+                {t(locale, 'admin.saveExerciseMeta')}
+              </button>
+            </div>
+            {exerciseDetail.data?.exercise ? (
+              <article className="notice notice--subtle">
+                <strong>{exerciseDetail.data.exercise.name}</strong>
+                <span className="muted">{exerciseDetail.data.exercise.description}</span>
+              </article>
+            ) : null}
+          </section>
         </section>
       </section>
 

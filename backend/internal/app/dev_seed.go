@@ -37,13 +37,13 @@ func (a *App) ensureDevelopmentUserLockedWithPassword(email string, roles []stri
 	}
 
 	user := &User{
-		ID:           token(8),
-		Email:        email,
-		PasswordHash: passwordHash,
-		Verified:     true,
-		Locale:       "ru",
-		Theme:        "light",
-		Roles:        append([]string(nil), roles...),
+		ID:                 token(8),
+		Email:              email,
+		PasswordHash:       passwordHash,
+		Verified:           true,
+		Locale:             "ru",
+		Theme:              "light",
+		Roles:              append([]string(nil), roles...),
 		MustChangePassword: mustChangePassword,
 		NotificationPreferences: NotificationPreferences{
 			HydrationReminder: true,

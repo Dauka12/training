@@ -1,5 +1,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import { afterEach, expect, test, vi } from 'vitest';
 import { PlanPage } from './pages';
 
@@ -9,7 +10,9 @@ function renderPlanPage() {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={client}>
-      <PlanPage locale="ru" />
+      <MemoryRouter>
+        <PlanPage locale="ru" />
+      </MemoryRouter>
     </QueryClientProvider>
   );
 }
